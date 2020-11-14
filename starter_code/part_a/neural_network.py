@@ -9,6 +9,8 @@ import torch.utils.data
 import numpy as np
 import torch
 
+import matplotlib.pyplot as plt
+
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -49,6 +51,7 @@ class AutoEncoder(nn.Module):
         # Define linear functions.
         self.g = nn.Linear(num_question, k)
         self.h = nn.Linear(k, num_question)
+        self.sigmoid = nn.Sigmoid()
 
     def get_weight_norm(self):
         """ Return ||W^1|| + ||W^2||.
@@ -71,13 +74,18 @@ class AutoEncoder(nn.Module):
         # Use sigmoid activations for f and g.                              #
         #####################################################################
         out = inputs
+        out = self.g(out)
+        out = self.sigmoid(out)
+        out = self.h(out)
+        out = self.sigmoid(out)
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
         return out
 
 
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
+          metrics, k):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -90,8 +98,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function. 
-    
+    # TODO: Add a regularizer to the cost function.
+
     # Tell PyTorch you are training the model.
     model.train()
 
@@ -120,6 +128,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
+        metrics[k]["Cost"].append(train_loss)
+        metrics[k]["Validation Accuracy"].append(valid_acc)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
     #####################################################################
@@ -153,6 +163,24 @@ def evaluate(model, train_data, valid_data):
     return correct / float(total)
 
 
+def get_plots(metrics):
+    for k in metrics:
+        data = metrics[k]
+        fig, ax1 = plt.subplots()
+        ax1.plot(list(range(len(data["Cost"]))), data["Cost"], color="red",
+                 marker="o")
+        ax1.set_xlabel("Epoch, k=" + str(k))
+        ax1.set_ylabel("Cost")
+
+        ax2 = ax1.twinx()
+        ax2.plot(list(range(len(data["Cost"]))), data["Validation Accuracy"],
+                 color="blue",
+                 marker="o")
+        ax2.set_xlabel("Epoch, k=" + str(k))
+        ax2.set_ylabel("Validation Accuracy")
+        plt.show()
+
+
 def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
 
@@ -162,16 +190,24 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = None
-    model = None
+    k_values = [10, 50, 100, 200, 500]
+    # k = 500
+    num_questions = zero_train_matrix.shape[1]
+    metrics = {}
+    for k in k_values:
+        print("K:", k)
+        model = AutoEncoder(num_question=num_questions, k=k)
 
-    # Set optimization hyperparameters.
-    lr = None
-    num_epoch = None
-    lamb = None
+        # Set optimization hyperparameters.
+        lr = 0.01
+        num_epoch = 2
+        lamb = None
+        metrics[k] = {"Cost": [], "Validation Accuracy": []}
+        train(model, lr, lamb, train_matrix, zero_train_matrix,
+              valid_data, num_epoch, metrics, k)
 
-    train(model, lr, lamb, train_matrix, zero_train_matrix,
-          valid_data, num_epoch)
+    get_plots(metrics)
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
