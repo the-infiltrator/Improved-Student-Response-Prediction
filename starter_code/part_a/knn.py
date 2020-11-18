@@ -1,5 +1,6 @@
 from sklearn.impute import KNNImputer
-from utils import *
+from starter_code_personal.utils import *
+import matplotlib.pyplot as plt
 
 
 def knn_impute_by_user(matrix, valid_data, k):
@@ -37,11 +38,53 @@ def knn_impute_by_item(matrix, valid_data, k):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    acc = None
+    nbrs = KNNImputer(n_neighbors=k)
+    mat = nbrs.fit_transform(matrix.T).T
+    acc = sparse_matrix_evaluate(valid_data, mat)
+    print("Validation Accuracy: {}".format(acc))
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     return acc
+
+
+def plot_acc(k_set, accuracy_set):
+    """
+    Plot the accuracy on the validation data as a function of k.
+
+    :param k_set: array of k values
+    :param accuracy_set: array of validation accuracy for each k
+    :return: None
+    """
+    plt.plot(k_set, accuracy_set, color='blue', marker='o',
+             label='Validation')
+    plt.title("Accuracy Vs Number of Nearest Neighbours")
+    plt.xlabel('k - Number of Nearest Neighbours')
+    plt.ylabel('Accuracy')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+def knn_test(matrix, test_data, k, case):
+    """
+    Report the final test accuracy with the chosen k value for k-Nearest
+    Neighbours.
+
+    :param matrix: 2D sparse matrix
+    :param test_data: A dictionary {user_id: list, question_id: list,
+    is_correct: list}
+    :param k: int
+    :return: float
+    """
+    nbrs = KNNImputer(n_neighbors=k)
+    if case == 'user':
+        mat = nbrs.fit_transform(matrix)
+    else:
+        mat = nbrs.fit_transform(matrix.T).T
+    test_acc = sparse_matrix_evaluate(test_data, mat)
+    print("Final Test Accuracy: {}".format(test_acc))
+    return test_acc
 
 
 def main():
@@ -60,7 +103,43 @@ def main():
     # the best performance and report the test accuracy with the        #
     # chosen k*.                                                        #
     #####################################################################
-    pass
+    accuracy_set_user = []
+    k_set = [1, 6, 11, 16, 21, 26]
+
+    for k in k_set:
+        acc = knn_impute_by_user(sparse_matrix, val_data, k)
+        accuracy_set_user.append(acc)
+
+    # plot showing accuracy with the validation set for each k
+    plot_acc(k_set, accuracy_set_user)
+
+    # find the k value with best performance
+    k_best_index = accuracy_set_user.index(np.max(accuracy_set_user))
+    k_best_user = k_set[k_best_index]
+    print('k* with highest performance on validation data is, k = {}'
+          .format(k_best_user))
+
+    # report final test accuracy
+    test_acc_user = knn_test(sparse_matrix, test_data, k_best_user, 'user')
+
+    # item-based collaborative filtering
+    accuracy_set_item = []
+
+    for k in k_set:
+        acc = knn_impute_by_item(sparse_matrix, val_data, k)
+        accuracy_set_item.append(acc)
+
+    # plot showing accuracy with the validation set for each k
+    plot_acc(k_set, accuracy_set_item)
+
+    # find the k value with best performance
+    k_best_index = accuracy_set_item.index(np.max(accuracy_set_item))
+    k_best_item = k_set[k_best_index]
+    print('k* with highest performance on validation data is, k = {}'
+          .format(k_best_item))
+
+    # report final test accuracy
+    test_acc_item = knn_test(sparse_matrix, test_data, k_best_item, 'item')
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
