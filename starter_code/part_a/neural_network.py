@@ -11,6 +11,8 @@ import torch
 
 import matplotlib.pyplot as plt
 
+import wandb
+
 
 def load_data(base_path="../data"):
     """ Load the data in PyTorch Tensor.
@@ -121,7 +123,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
-            loss = torch.sum((output - target) ** 2.)
+            loss = torch.sum((output - target) ** 2.) + lamb / (
+                        2 * num_student) * model.get_weight_norm()
             loss.backward()
 
             train_loss += loss.item()
@@ -132,6 +135,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
         metrics[k]["Validation Accuracy"].append(valid_acc)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
+        # wandb.log({"Training Cost": train_loss,
+                   # "Validation Accuracy": valid_acc}, step=epoch)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -182,6 +187,7 @@ def get_plots(metrics):
 
 
 def main():
+    # wandb.init(project="csc311-autoencoder")
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
 
     #####################################################################
@@ -191,16 +197,17 @@ def main():
     #####################################################################
     # Set model hyperparameters.
     k_values = [10, 50, 100, 200, 500]
-    # k = 500
+    # k = 10
     num_questions = zero_train_matrix.shape[1]
     metrics = {}
     for k in k_values:
         print("K:", k)
         model = AutoEncoder(num_question=num_questions, k=k)
+        # wandb.watch(model)
 
         # Set optimization hyperparameters.
         lr = 0.01
-        num_epoch = 2
+        num_epoch = 100
         lamb = None
         metrics[k] = {"Cost": [], "Validation Accuracy": []}
         train(model, lr, lamb, train_matrix, zero_train_matrix,
