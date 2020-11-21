@@ -11,7 +11,7 @@ import torch
 
 import matplotlib.pyplot as plt
 
-import wandb
+
 
 
 def load_data(base_path="../data"):
@@ -100,7 +100,6 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function.
 
     # Tell PyTorch you are training the model.
     model.train()
@@ -131,12 +130,10 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
-        metrics[k]["Cost"].append(train_loss)
-        metrics[k]["Validation Accuracy"].append(valid_acc)
+        metrics[lamb]["Cost"].append(train_loss)
+        metrics[lamb]["Validation Accuracy"].append(valid_acc)
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
               "Valid Acc: {}".format(epoch, train_loss, valid_acc))
-        # wandb.log({"Training Cost": train_loss,
-                   # "Validation Accuracy": valid_acc}, step=epoch)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -172,44 +169,38 @@ def get_plots(metrics):
     for k in metrics:
         data = metrics[k]
         fig, ax1 = plt.subplots()
-        ax1.plot(list(range(len(data["Cost"]))), data["Cost"], color="red",
-                 marker="o")
+        ax1.plot(list(range(len(data["Cost"]))), data["Cost"], color="red")
         ax1.set_xlabel("Epoch, k=" + str(k))
         ax1.set_ylabel("Cost")
 
         ax2 = ax1.twinx()
         ax2.plot(list(range(len(data["Cost"]))), data["Validation Accuracy"],
-                 color="blue",
-                 marker="o")
-        ax2.set_xlabel("Epoch, k=" + str(k))
+                 color="blue")
+        ax2.set_xlabel("Epoch, lambda=" + str(k))
         ax2.set_ylabel("Validation Accuracy")
         plt.show()
 
 
 def main():
-    # wandb.init(project="csc311-autoencoder")
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
-
+    np.random.seed(311)
+    num_questions = zero_train_matrix.shape[1]
     #####################################################################
     # TODO:                                                             #
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k_values = [10, 50, 100, 200, 500]
-    # k = 10
-    num_questions = zero_train_matrix.shape[1]
-    metrics = {}
-    for k in k_values:
-        print("K:", k)
-        model = AutoEncoder(num_question=num_questions, k=k)
-        # wandb.watch(model)
+    k = 10
 
-        # Set optimization hyperparameters.
-        lr = 0.01
-        num_epoch = 100
-        lamb = None
-        metrics[k] = {"Cost": [], "Validation Accuracy": []}
+    metrics = {}
+    # Set optimization hyperparameters.
+    lr = 0.1
+    num_epoch = 10
+    lambda_values = [0, 0.001, 0.01, 0.1, 1]
+    for lamb in lambda_values:
+        model = AutoEncoder(num_question=num_questions, k=k)
+        metrics[lamb] = {"Cost": [], "Validation Accuracy": []}
         train(model, lr, lamb, train_matrix, zero_train_matrix,
               valid_data, num_epoch, metrics, k)
 
