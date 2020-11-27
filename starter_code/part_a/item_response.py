@@ -1,7 +1,6 @@
 from utils import *
 
 import numpy as np
-# import tensorflow as tf
 
 def sigmoid(x):
     """ Apply sigmoid function.
@@ -12,7 +11,7 @@ def _difference_matrix(sparse_matrix,theta, beta):
     """
     Generate a difference matrix D, with D_{ij} = theta_i - beta_j
     """
-    C = sparse_matrix.toarray()
+    C = np.nan_to_num(sparse_matrix.toarray())
     theta_matrix = np.tile(theta, (C.shape[1], 1)).T
     beta_matrix = np.tile(beta, (C.shape[0], 1))
     diff = theta_matrix-beta_matrix
@@ -33,18 +32,18 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    C  = sparse_matrix.toarray()
-    thetadotc  = np.nansum(theta @ C)
-    cdotbeta = np.nansum(C@beta)
+    C  = np.nan_to_num(sparse_matrix.toarray())
+    thetadotc = np.sum(theta @ C)
+    cdotbeta = np.sum(C@beta)
     cdiff = thetadotc-cdotbeta
     diff_mat = _difference_matrix(sparse_matrix,theta,beta)
-    log_diff = np.sum(np.sum(np.log(1+np.exp(diff_mat)), axis=0))
+    log_diff = np.sum(np.log(1+np.exp(diff_mat)))
     log_lklihood = cdiff - log_diff
 
-    # np.nansum(np.array([sparse_matrix[i, j] * (theta[i] - beta[j]) - np.log(1 + np.exp(theta[i] - beta[j])) for i in
+    # log_lklihood = np.nansum(np.array([sparse_matrix[i, j] * (theta[i] - beta[j]) - np.log(1 + np.exp(theta[i] - beta[j])) for i in
     # range(sparse_matrix.shape[0]) for j in range(sparse_matrix.shape[1])]))
-
-    print(log_lklihood)
+    # tf.reduce_sum(C * tf.log(tf.sigmoid(theta - beta)) + (1 - C) * tf.log(1 - tf.sigmoid(theta - a)))
+    # print(log_lklihood)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -73,14 +72,15 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    C = sparse_matrix.toarray()
-    sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
-    for i in range(1000):
+    C = np.nan_to_num(sparse_matrix.toarray())
+    for i in range(100):
+        sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
         # print(np.nansum(C, axis=1).shape)
-        dl_dtheta = np.nansum(C, axis=1) - np.nansum(sig_diff_mat, axis=1)
-        dl_dbeta = -np.nansum(C, axis=0) + np.nansum(sig_diff_mat, axis=0)
+        dl_dtheta = -(np.nansum(C, axis=1) - np.nansum(sig_diff_mat, axis=1))
+        dl_dbeta = -(-np.nansum(C, axis=0) + np.nansum(sig_diff_mat, axis=0))
         theta = theta - lr * dl_dtheta
         beta = beta - lr * dl_dbeta
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -149,11 +149,10 @@ def main():
     # # Tune learning rate and number of iterations. With the implemented #
     # # code, report the validation and test accuracy.                    #
     # #####################################################################
-    irt(sparse_matrix, val_data, 0.1, 1000)
+    irt(sparse_matrix, val_data, 0.1, 100)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
-
     #####################################################################
     # TODO:                                                             #
     # Implement part (c)                                                #
