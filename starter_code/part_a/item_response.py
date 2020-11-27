@@ -1,15 +1,24 @@
 from utils import *
 
 import numpy as np
-
+# import tensorflow as tf
 
 def sigmoid(x):
     """ Apply sigmoid function.
     """
     return np.exp(x) / (1 + np.exp(x))
 
+def _difference_matrix(sparse_matrix,theta, beta):
+    """
+    Generate a difference matrix D, with D_{ij} = theta_i - beta_j
+    """
+    C = sparse_matrix.toarray()
+    theta_matrix = np.tile(theta, (C.shape[1], 1)).T
+    beta_matrix = np.tile(beta, (C.shape[0], 1))
+    diff = theta_matrix-beta_matrix
+    return diff
 
-def neg_log_likelihood(data, theta, beta):
+def neg_log_likelihood(sparse_matrix, theta, beta):
     """ Compute the negative log-likelihood.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -24,14 +33,25 @@ def neg_log_likelihood(data, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    log_lklihood = 0.
+    C  = sparse_matrix.toarray()
+    thetadotc  = np.nansum(theta @ C)
+    cdotbeta = np.nansum(C@beta)
+    cdiff = thetadotc-cdotbeta
+    diff_mat = _difference_matrix(sparse_matrix,theta,beta)
+    log_diff = np.sum(np.sum(np.log(1+np.exp(diff_mat)), axis=0))
+    log_lklihood = cdiff - log_diff
+
+    # np.nansum(np.array([sparse_matrix[i, j] * (theta[i] - beta[j]) - np.log(1 + np.exp(theta[i] - beta[j])) for i in
+    # range(sparse_matrix.shape[0]) for j in range(sparse_matrix.shape[1])]))
+
+    print(log_lklihood)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     return -log_lklihood
 
 
-def update_theta_beta(data, lr, theta, beta):
+def update_theta_beta(sparse_matrix, lr, theta, beta):
     """ Update theta and beta using gradient descent.
 
     You are using alternating gradient descent. Your update should look:
@@ -48,18 +68,26 @@ def update_theta_beta(data, lr, theta, beta):
     :param beta: Vector
     :return: tuple of vectors
     """
+
     #####################################################################
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    pass
+    C = sparse_matrix.toarray()
+    sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
+    for i in range(1000):
+        # print(np.nansum(C, axis=1).shape)
+        dl_dtheta = np.nansum(C, axis=1) - np.nansum(sig_diff_mat, axis=1)
+        dl_dbeta = -np.nansum(C, axis=0) + np.nansum(sig_diff_mat, axis=0)
+        theta = theta - lr * dl_dtheta
+        beta = beta - lr * dl_dbeta
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     return theta, beta
 
 
-def irt(data, val_data, lr, iterations):
+def irt(sparse_matrix, val_data, lr, iterations):
     """ Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -73,17 +101,17 @@ def irt(data, val_data, lr, iterations):
     :return: (theta, beta, val_acc_lst)
     """
     # TODO: Initialize theta and beta.
-    theta = None
-    beta = None
+    theta = np.zeros(sparse_matrix.shape[0])
+    beta = np.zeros(sparse_matrix.shape[1])
 
     val_acc_lst = []
 
     for i in range(iterations):
-        neg_lld = neg_log_likelihood(data, theta=theta, beta=beta)
+        neg_lld = neg_log_likelihood(sparse_matrix, theta=theta, beta=beta)
         score = evaluate(data=val_data, theta=theta, beta=beta)
         val_acc_lst.append(score)
         print("NLLK: {} \t Score: {}".format(neg_lld, score))
-        theta, beta = update_theta_beta(data, lr, theta, beta)
+        theta, beta = update_theta_beta(sparse_matrix, lr, theta, beta)
 
     # TODO: You may change the return values to achieve what you want.
     return theta, beta, val_acc_lst
@@ -109,18 +137,19 @@ def evaluate(data, theta, beta):
 
 
 def main():
+
     train_data = load_train_csv("../data")
     # You may optionally use the sparse matrix.
     sparse_matrix = load_train_sparse("../data")
     val_data = load_valid_csv("../data")
+    # print(sparse_matrix[1, 2])
     test_data = load_public_test_csv("../data")
-
-    #####################################################################
-    # TODO:                                                             #
-    # Tune learning rate and number of iterations. With the implemented #
-    # code, report the validation and test accuracy.                    #
-    #####################################################################
-    pass
+    # #####################################################################
+    # # TODO:                                                             #
+    # # Tune learning rate and number of iterations. With the implemented #
+    # # code, report the validation and test accuracy.                    #
+    # #####################################################################
+    irt(sparse_matrix, val_data, 0.1, 1000)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
