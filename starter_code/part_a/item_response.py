@@ -1,5 +1,5 @@
 from utils import *
-
+from sklearn.impute import KNNImputer
 import numpy as np
 
 def sigmoid(x):
@@ -11,7 +11,8 @@ def _difference_matrix(sparse_matrix,theta, beta):
     """
     Generate a difference matrix D, with D_{ij} = theta_i - beta_j
     """
-    C = np.nan_to_num(sparse_matrix.toarray())
+    # C = np.nan_to_num(sparse_matrix.toarray())
+    C = sparse_matrix
     theta_matrix = np.tile(theta, (C.shape[1], 1)).T
     beta_matrix = np.tile(beta, (C.shape[0], 1))
     diff = theta_matrix-beta_matrix
@@ -32,7 +33,8 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    C  = np.nan_to_num(sparse_matrix.toarray())
+    # C  = np.nan_to_num(sparse_matrix.toarray())
+    C = sparse_matrix
     thetadotc = np.sum(theta @ C)
     cdotbeta = np.sum(C@beta)
     cdiff = thetadotc-cdotbeta
@@ -72,7 +74,9 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    C = np.nan_to_num(sparse_matrix.toarray())
+    # C = np.nan_to_num(sparse_matrix.toarray())
+    C = sparse_matrix
+
     for i in range(100):
         sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
         # print(np.nansum(C, axis=1).shape)
@@ -144,12 +148,17 @@ def main():
     val_data = load_valid_csv("../data")
     # print(sparse_matrix[1, 2])
     test_data = load_public_test_csv("../data")
+
+    nbrs = KNNImputer(n_neighbors=11)
+    # We use NaN-Euclidean distance measure.
+    C = sparse_matrix.toarray()
+    sparse_matrix = nbrs.fit_transform(C)
     # #####################################################################
     # # TODO:                                                             #
     # # Tune learning rate and number of iterations. With the implemented #
     # # code, report the validation and test accuracy.                    #
     # #####################################################################
-    irt(sparse_matrix, val_data, 0.1, 100)
+    irt(sparse_matrix, test_data, 0.01, 20)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
