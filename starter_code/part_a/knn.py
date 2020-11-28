@@ -20,7 +20,7 @@ def knn_impute_by_user(matrix, valid_data, k):
     # We use NaN-Euclidean distance measure.
     mat = nbrs.fit_transform(matrix)
     acc = sparse_matrix_evaluate(valid_data, mat)
-    print("Validation Accuracy: {}".format(acc))
+    print(f" K = {k}, Validation Accuracy = {acc}\n")
     return acc
 
 
@@ -35,20 +35,19 @@ def knn_impute_by_item(matrix, valid_data, k):
     :return: float
     """
     #####################################################################
-    # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
     nbrs = KNNImputer(n_neighbors=k)
     mat = nbrs.fit_transform(matrix.T).T
     acc = sparse_matrix_evaluate(valid_data, mat)
-    print("Validation Accuracy: {}".format(acc))
+    print(f"K = {k}, Validation Accuracy = {acc}\n")
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     return acc
 
 
-def plot_acc(k_set, accuracy_set):
+def plot_acc(k_set, accuracy_set, case):
     """
     Plot the accuracy on the validation data as a function of k.
 
@@ -56,14 +55,16 @@ def plot_acc(k_set, accuracy_set):
     :param accuracy_set: array of validation accuracy for each k
     :return: None
     """
-    plt.plot(k_set, accuracy_set, color='blue', marker='o',
-             label='Validation')
-    plt.title("Accuracy Vs Number of Nearest Neighbours")
-    plt.xlabel('k - Number of Nearest Neighbours')
+    plt.style.use('ggplot')
+    plt.style.use('seaborn-paper')
+    plt.xlabel('Value of k for kNN')
     plt.ylabel('Accuracy')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    plt.plot(k_set, accuracy_set, color="darkcyan", marker='o')
+    plt.plot(k_set, accuracy_set, color="darkcyan",
+             label="Validation Set")
+    plt.legend(loc="upper left")
+    plt.savefig(f"knn_{case}.png")
+    plt.close()
 
 
 def knn_test(matrix, test_data, k, case):
@@ -83,7 +84,6 @@ def knn_test(matrix, test_data, k, case):
     else:
         mat = nbrs.fit_transform(matrix.T).T
     test_acc = sparse_matrix_evaluate(test_data, mat)
-    print("Final Test Accuracy: {}".format(test_acc))
     return test_acc
 
 
@@ -92,13 +92,12 @@ def main():
     val_data = load_valid_csv("../data")
     test_data = load_public_test_csv("../data")
 
-    print("Sparse matrix:")
-    print(sparse_matrix)
-    print("Shape of sparse matrix:")
-    print(sparse_matrix.shape)
+    # print("Sparse matrix:")
+    # print(sparse_matrix)
+    # print("Shape of sparse matrix:")
+    # print(sparse_matrix.shape)
 
     #####################################################################
-    # TODO:                                                             #
     # Compute the validation accuracy for each k. Then pick k* with     #
     # the best performance and report the test accuracy with the        #
     # chosen k*.                                                        #
@@ -106,23 +105,36 @@ def main():
     accuracy_set_user = []
     k_set = [1, 6, 11, 16, 21, 26]
 
+    print(
+        f"#########################################################################################\n"
+        f"                      PERFORMING USER-BASED COLLABORATIVE FILTERING                              \n"
+        f"#########################################################################################\n")
+
     for k in k_set:
         acc = knn_impute_by_user(sparse_matrix, val_data, k)
         accuracy_set_user.append(acc)
 
-    # plot showing accuracy with the validation set for each k
-    plot_acc(k_set, accuracy_set_user)
-
     # find the k value with best performance
     k_best_index = accuracy_set_user.index(np.max(accuracy_set_user))
     k_best_user = k_set[k_best_index]
-    print('k* with highest performance on validation data is, k = {}'
-          .format(k_best_user))
+
+    # plot showing accuracy with the validation set for each k
+    plot_acc(k_set, accuracy_set_user, "user")
 
     # report final test accuracy
     test_acc_user = knn_test(sparse_matrix, test_data, k_best_user, 'user')
+    print(
+        f'###################################################################################\n'
+        f'                                EXPERIMENT COMPLETE                                  \n'
+        f'                     Best  K = {k_best_user}, Test Accuracy ='
+        f' {test_acc_user} \n'
+        f'###################################################################################\n')
 
     # item-based collaborative filtering
+    print(
+        f"#########################################################################################\n"
+        f"                      PERFORMING ITEM-BASED COLLABORATIVE FILTERING                              \n"
+        f"#########################################################################################\n")
     accuracy_set_item = []
 
     for k in k_set:
@@ -130,16 +142,20 @@ def main():
         accuracy_set_item.append(acc)
 
     # plot showing accuracy with the validation set for each k
-    plot_acc(k_set, accuracy_set_item)
+    plot_acc(k_set, accuracy_set_item, "item")
 
     # find the k value with best performance
     k_best_index = accuracy_set_item.index(np.max(accuracy_set_item))
     k_best_item = k_set[k_best_index]
-    print('k* with highest performance on validation data is, k = {}'
-          .format(k_best_item))
-
-    # report final test accuracy
+    # Use chosen value of k to compute final test accuracy
     test_acc_item = knn_test(sparse_matrix, test_data, k_best_item, 'item')
+    print(
+        f'###################################################################################\n'
+        f'                                EXPERIMENT COMPLETE                                  \n'
+        f'                     Best  K = {k_best_item}, Test Accuracy ='
+        f' {test_acc_item} \n'
+        f'###################################################################################\n')
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
