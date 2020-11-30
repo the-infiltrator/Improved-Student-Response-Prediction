@@ -57,7 +57,7 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
     diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
     cdiff = np.sum(np.multiply(C, diff_mat))
 
-    log_diff = np.sum(np.log(1 + np.exp(diff_mat)))
+    log_diff = np.sum(remove_nan_indices(sparse_matrix, np.log(1 + np.exp(diff_mat))))
     log_lklihood = cdiff - log_diff
     #####################################################################
     #                       END OF YOUR CODE                            #
