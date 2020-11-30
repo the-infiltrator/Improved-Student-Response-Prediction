@@ -1,21 +1,41 @@
 from utils import *
+from check_grad import check_grad
 
 import numpy as np
+
 
 def sigmoid(x):
     """ Apply sigmoid function.
     """
-    return np.exp(x) / (1 + np.exp(x))
+    # return np.exp(x) / (1 + np.exp(x))
+    # return 1 / (1 + np.exp(-x))
+    return np.exp(-np.logaddexp(0, -x))
 
-def _difference_matrix(sparse_matrix,theta, beta):
+
+def _difference_matrix(sparse_matrix, theta, beta):
     """
     Generate a difference matrix D, with D_{ij} = theta_i - beta_j
     """
     C = np.nan_to_num(sparse_matrix.toarray())
     theta_matrix = np.tile(theta, (C.shape[1], 1)).T
     beta_matrix = np.tile(beta, (C.shape[0], 1))
-    diff = theta_matrix-beta_matrix
+    diff = theta_matrix - beta_matrix
+    # diff[np.isnan(sparse_matrix.toarray())] = 0
     return diff
+
+
+def remove_nan_indices(sparse_matrix, matrix):
+    """
+    PRECONDITION: sparse_matrix.shape == matrix.shape
+    For every [i,j] in sparse_matrix, if the value is NaN/Missing,
+    make matrix[i,j] = 0
+
+    Does not modify the original matrix.
+    """
+    m = np.copy(matrix)
+    m[np.isnan(sparse_matrix.toarray())] = 0
+    return m
+
 
 def neg_log_likelihood(sparse_matrix, theta, beta):
     """ Compute the negative log-likelihood.
@@ -32,18 +52,13 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
     # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
-    C  = np.nan_to_num(sparse_matrix.toarray())
-    thetadotc = np.sum(theta @ C)
-    cdotbeta = np.sum(C@beta)
-    cdiff = thetadotc-cdotbeta
-    diff_mat = _difference_matrix(sparse_matrix,theta,beta)
-    log_diff = np.sum(np.log(1+np.exp(diff_mat)))
-    log_lklihood = cdiff - log_diff
+    C = np.nan_to_num(sparse_matrix.toarray())
+    diff_mat = _difference_matrix(sparse_matrix, theta, beta)
+    diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
+    cdiff = np.sum(np.multiply(C, diff_mat))
 
-    # log_lklihood = np.nansum(np.array([sparse_matrix[i, j] * (theta[i] - beta[j]) - np.log(1 + np.exp(theta[i] - beta[j])) for i in
-    # range(sparse_matrix.shape[0]) for j in range(sparse_matrix.shape[1])]))
-    # tf.reduce_sum(C * tf.log(tf.sigmoid(theta - beta)) + (1 - C) * tf.log(1 - tf.sigmoid(theta - a)))
-    # print(log_lklihood)
+    log_diff = np.sum(np.log(1 + np.exp(diff_mat)))
+    log_lklihood = cdiff - log_diff
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -73,13 +88,17 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
     # Implement the function as described in the docstring.             #
     #####################################################################
     C = np.nan_to_num(sparse_matrix.toarray())
-    for i in range(100):
+
+    for i in range(1):
         sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
-        # print(np.nansum(C, axis=1).shape)
-        dl_dtheta = -(np.nansum(C, axis=1) - np.nansum(sig_diff_mat, axis=1))
-        dl_dbeta = -(-np.nansum(C, axis=0) + np.nansum(sig_diff_mat, axis=0))
-        theta = theta - lr * dl_dtheta
-        beta = beta - lr * dl_dbeta
+        sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
+        dl_dtheta = (np.sum(C, axis=1) - np.sum(sig_diff_mat, axis=1))
+        theta += lr * dl_dtheta
+
+        sig_diff_mat2 = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
+        sig_diff_mat2 = remove_nan_indices(sparse_matrix, sig_diff_mat2)
+        dl_dbeta = (-np.sum(C, axis=0) + np.sum(sig_diff_mat2, axis=0))
+        beta += lr * dl_dbeta
 
     #####################################################################
     #                       END OF YOUR CODE                            #
@@ -100,7 +119,6 @@ def irt(sparse_matrix, val_data, lr, iterations):
     :param iterations: int
     :return: (theta, beta, val_acc_lst)
     """
-    # TODO: Initialize theta and beta.
     theta = np.zeros(sparse_matrix.shape[0])
     beta = np.zeros(sparse_matrix.shape[1])
 
@@ -113,7 +131,6 @@ def irt(sparse_matrix, val_data, lr, iterations):
         print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta = update_theta_beta(sparse_matrix, lr, theta, beta)
 
-    # TODO: You may change the return values to achieve what you want.
     return theta, beta, val_acc_lst
 
 
@@ -136,20 +153,60 @@ def evaluate(data, theta, beta):
            / len(data["is_correct"])
 
 
-def main():
+def check_grad_theta(theta, sparse_matrix, beta):
+    ll = -neg_log_likelihood(sparse_matrix, theta, beta)
+    C = np.nan_to_num(sparse_matrix.toarray())
+    sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
+    sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
+    dl_dtheta = (np.sum(C, axis=1) - np.sum(sig_diff_mat, axis=1))
+    return ll, dl_dtheta
 
+
+def check_grad_beta(beta, sparse_matrix, theta):
+    ll = -neg_log_likelihood(sparse_matrix, theta, beta)
+    C = np.nan_to_num(sparse_matrix.toarray())
+    sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
+    sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
+    dl_dbeta = (-np.sum(C, axis=0) + np.sum(sig_diff_mat, axis=0))
+    return ll, dl_dbeta
+
+
+def run_check_grad_theta(sparse_matrix):
+    theta = np.zeros(sparse_matrix.shape[0])
+    beta = np.zeros(sparse_matrix.shape[1])
+    diff = check_grad(check_grad_theta,
+                      theta,
+                      0.001,
+                      sparse_matrix,
+                      beta)
+    print("diff theta=", diff)
+
+
+def run_check_grad_beta(sparse_matrix):
+    theta = np.zeros(sparse_matrix.shape[0])
+    beta = np.zeros(sparse_matrix.shape[1])
+    diff = check_grad(check_grad_beta,
+                      beta,
+                      0.001,
+                      sparse_matrix,
+                      theta)
+    print("diff beta=", diff)
+
+
+def main():
     train_data = load_train_csv("../data")
     # You may optionally use the sparse matrix.
     sparse_matrix = load_train_sparse("../data")
     val_data = load_valid_csv("../data")
-    # print(sparse_matrix[1, 2])
     test_data = load_public_test_csv("../data")
     # #####################################################################
     # # TODO:                                                             #
     # # Tune learning rate and number of iterations. With the implemented #
     # # code, report the validation and test accuracy.                    #
     # #####################################################################
-    irt(sparse_matrix, val_data, 0.1, 100)
+    run_check_grad_theta(sparse_matrix[:50, :75])
+    run_check_grad_beta(sparse_matrix[:50, :75])
+    irt(sparse_matrix, val_data, 0.001, 100)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
