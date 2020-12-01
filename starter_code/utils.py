@@ -3,6 +3,7 @@ from scipy.sparse import load_npz
 import numpy as np
 import csv
 import os
+import pandas as pd
 
 
 def _load_csv(path):
@@ -103,6 +104,34 @@ def load_private_test_csv(root_dir="/data"):
     """
     path = os.path.join(root_dir, "private_test_data.csv")
     return _load_csv(path)
+
+
+def load_question_meta_csv(root_dir="/data"):
+    """ Load the question_metadata as a dictionary.
+
+    :param root_dir: str
+    :return: A dictionary {user_id: list, question_id: list, is_correct: list}
+        WHERE
+        user_id: a list of user id.
+        question_id: a list of question id.
+        is_correct: an empty list.
+    """
+    path = os.path.join(root_dir, "question_meta.csv")
+    return pd.read_csv(path)
+
+
+def load_student_meta_csv(root_dir="/data"):
+    """ Load the student_metadata as a dictionary.
+
+    :param root_dir: str
+    :return: A dictionary {user_id: list, question_id: list, is_correct: list}
+        WHERE
+        user_id: a list of user id.
+        question_id: a list of question id.
+        is_correct: an empty list.
+    """
+    path = os.path.join(root_dir, "student_meta.csv")
+    return pd.read_csv(path)
 
 
 def save_private_test_csv(data, file_name="private_test_result.csv"):

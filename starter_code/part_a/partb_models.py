@@ -3,7 +3,7 @@ from numpy import loadtxt
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-
+from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn import metrics
@@ -11,64 +11,62 @@ from sklearn.linear_model import LogisticRegressionCV
 from sklearn.naive_bayes import CategoricalNB
 from xgboost import XGBClassifier
 from catboost import CatBoostClassifier, Pool, cv
+from sklearn import linear_model
+from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 
-def train_models(train_data, val_data, test_data):
 
-    X = []
-    for i in range(len(train_data['user_id'])):
-        X.append([train_data['user_id'][i], train_data['question_id'][i]])
-    y = train_data['is_correct']
-
+def train_models(X, X_val, y, y_val):
     logistic = LogisticRegressionCV(cv=10, penalty='l2', random_state=0).fit(X, y)
 
     gnb = CategoricalNB()
-    nb = gnb.fit(X,y)
+    gnb.fit(X, y)
 
     xgb = XGBClassifier()
     xgb.fit(np.array(X), np.array(y))
 
-    cb  = CatBoostClassifier()
-    cb.fit(X,y)
-    X_val = []
-    for i in range(len(val_data['user_id'])):
-        X_val.append([val_data['user_id'][i], val_data['question_id'][i]])
-    y_val = val_data['is_correct']
+    cb = CatBoostClassifier()
+    cb.fit(X, y)
 
+    mlp = MLPClassifier(solver='lbfgs', alpha=0.01, hidden_layer_sizes=(5, 5, 5, 5), random_state=1, max_iter=1000)
+    mlp.fit(X, y)
 
-    lgval_accuracy = logistic.score(X_val, y_val)
-
-    print(f"Logistic Regression: {lgval_accuracy} \n"
-          f"Categorical Naive Bayes:  {metrics.accuracy_score(y_val, gnb.predict(X_val))} \n"
-          f"Gradient Boosted Trees (XGBoost): {metrics.accuracy_score(y_val, xgb.predict(np.array(X_val)))}\n"
-          f"CatBoost Algorithm: {metrics.accuracy_score(y_val, cb.predict(np.array(X_val)))}")
+    print(f"\n \nLogistic Regression: {metrics.accuracy_score(y_val, logistic.predict(np.array(X_val)))} ")
+    print(f"Categorical Naive Bayes:  {metrics.accuracy_score(y_val, gnb.predict(X_val))} ")
+    print(f"Gradient Boosted Trees (XGBoost): {metrics.accuracy_score(y_val, xgb.predict(np.array(X_val)))}")
+    print(f"CatBoost Algorithm: {metrics.accuracy_score(y_val, cb.predict(np.array(X_val)))}")
+    print(f"Neural Network(MLP): {metrics.accuracy_score(y_val, mlp.predict(np.array(X_val)))}")
 
 
 def main():
-    sparse_matrix = load_train_sparse("../data").toarray()
-    train_data = load_train_csv("../data")
-    val_data = load_valid_csv("../data")
-    test_data = load_public_test_csv("../data")
-    train_models(train_data, val_data, test_data)
-    student_metadata = load_student_meta_csv("../data")
-    # student_metadata =
-    question_metadata = load_question_meta_csv("../data")
-    # print(train_data.keys())
-    # print(student_metadata.keys())
-
-
+    X, X_val, y, y_val = data_prep()
+    train_models(X, X_val, y, y_val)
 
 
 def data_prep():
     """
     Prepare data-set for modelling
     """
-    train_data = pd.DataFrame(load_train_csv("../data"))
+    old_train_data = pd.DataFrame(load_train_csv("../data"))
     test_data = pd.DataFrame(load_public_test_csv("../data"))
     student_metadata = load_student_meta_csv("../data")
     question_metadata = load_question_meta_csv("../data")
-    print(train_data)
-    print(pd.merge(train_data,student_metadata,on="user_id"))
+
+    train_data = pd.merge(old_train_data, student_metadata, on="user_id")
+    old_val_data = pd.DataFrame(load_valid_csv("../data"))
+    val_data = pd.merge(old_val_data, student_metadata, on="user_id")
+    X = []
+    for i in range(len(train_data['user_id'])):
+        X.append([train_data['user_id'][i], train_data['question_id'][i], train_data['gender'][i]])
+
+    y = train_data['is_correct']
+
+    X_val = []
+    for i in range(len(val_data['user_id'])):
+        X_val.append([val_data['user_id'][i], val_data['question_id'][i], val_data['gender'][i]])
+    y_val = val_data['is_correct']
+
+    return X, X_val, y, y_val
 
 
 if __name__ == "__main__":
