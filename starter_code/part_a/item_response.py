@@ -2,6 +2,8 @@ from utils import *
 from check_grad import check_grad
 
 import numpy as np
+from sklearn.utils import resample
+from scipy.sparse import csr_matrix
 
 
 def sigmoid(x):
@@ -57,7 +59,8 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
     diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
     cdiff = np.sum(np.multiply(C, diff_mat))
 
-    log_diff = np.sum(remove_nan_indices(sparse_matrix, np.log(1 + np.exp(diff_mat))))
+    log_diff = np.sum(
+        remove_nan_indices(sparse_matrix, np.log(1 + np.exp(diff_mat))))
     log_lklihood = cdiff - log_diff
     #####################################################################
     #                       END OF YOUR CODE                            #
@@ -104,6 +107,77 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
     #                       END OF YOUR CODE                            #
     #####################################################################
     return theta, beta
+
+
+def weighted_neg_log_liklihood(sparse_matrix, theta, beta, weights):
+    C = np.nan_to_num(sparse_matrix.toarray())
+    observation_weights = np.nan_to_num(weights.toarray())
+    diff_mat = _difference_matrix(sparse_matrix, theta,
+                                  beta) * observation_weights
+    diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
+    cdiff = np.sum(np.multiply(C * observation_weights, diff_mat))
+
+    log_diff = np.sum(
+        remove_nan_indices(sparse_matrix, np.log(1 + np.exp(diff_mat))))
+    log_lklihood = cdiff - log_diff
+    return log_lklihood
+
+
+def weighted_update_theta_beta(sparse_matrix, lr, theta, beta, weights):
+    C = np.nan_to_num(sparse_matrix.toarray())
+    observation_weights = weights.toarray()
+
+    for i in range(1):
+        sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta,
+                                                  beta))
+        sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
+        dl_dtheta = (np.sum(C * observation_weights, axis=1) - np.sum(
+            sig_diff_mat * observation_weights, axis=1))
+        theta += lr * dl_dtheta
+
+        sig_diff_mat2 = sigmoid(_difference_matrix(sparse_matrix, theta,
+                                                   beta)) * observation_weights
+        sig_diff_mat2 = remove_nan_indices(sparse_matrix, sig_diff_mat2)
+        dl_dbeta = (-np.sum(C * observation_weights, axis=0) + np.sum(
+            sig_diff_mat2, axis=0))
+        beta += lr * dl_dbeta
+
+    #####################################################################
+    #                       END OF YOUR CODE                            #
+    #####################################################################
+    return theta, beta
+
+
+def weighted_train(sparse_matrix, theta, beta, weights, lr, iterations):
+    for i in range(iterations):
+        print(f"IRT: Iteration #{i + 1}")
+        theta, beta = weighted_update_theta_beta(sparse_matrix, lr, theta, beta,
+                                                 weights)
+    return theta, beta
+
+def train(sparse_matrix, theta, beta, weights, lr, iterations):
+    for i in range(iterations):
+        print(f"IRT: Iteration #{i + 1}")
+        theta, beta = update_theta_beta(sparse_matrix, lr, theta, beta)
+    return theta, beta
+
+
+def weighted_irt(sparse_matrix, val_data, lr, iterations, weights):
+    theta = np.zeros(sparse_matrix.shape[0])
+    beta = np.zeros(sparse_matrix.shape[1])
+
+    val_acc_lst = []
+
+    for i in range(iterations):
+        neg_lld = weighted_neg_log_liklihood(sparse_matrix, theta=theta,
+                                             beta=beta, weights=weights)
+        score = evaluate(data=val_data, theta=theta, beta=beta)
+        val_acc_lst.append(score)
+        print("NLLK: {} \t Score: {}".format(neg_lld, score))
+        theta, beta = weighted_update_theta_beta(sparse_matrix, lr, theta, beta,
+                                                 weights)
+
+    return theta, beta, val_acc_lst
 
 
 def irt(sparse_matrix, val_data, lr, iterations):
@@ -207,6 +281,10 @@ def main():
     run_check_grad_theta(sparse_matrix[:50, :75])
     run_check_grad_beta(sparse_matrix[:50, :75])
     irt(sparse_matrix, val_data, 0.001, 100)
+    # weights = np.copy(sparse_matrix.toarray())
+    # weights[~np.isnan(weights)] = 1
+    # weights[np.isnan(weights)] = 0
+    # weighted_irt(sparse_matrix, val_data, 0.001, 100, csr_matrix(weights))
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
