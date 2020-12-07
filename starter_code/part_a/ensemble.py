@@ -32,9 +32,11 @@ class IRTPredictor(BaggedPredictor):
         print(self.theta.shape, self.beta.shape)
 
     def train(self, **kwargs):
-        self.theta, self.beta = item_response.weighted_train(self.data, self.theta,
-                                                    self.beta,
-                                                    self.weights, **kwargs)
+        self.theta, self.beta = item_response.weighted_train(self.data,
+                                                             self.theta,
+                                                             self.beta,
+                                                             self.weights,
+                                                             **kwargs)
 
     def predict(self, data, question_id, user_id):
         x = (self.theta[user_id] - self.beta[question_id]).sum()
@@ -50,16 +52,16 @@ class IRTPredictor(BaggedPredictor):
 
 def generate_bagged_sparse_dataset(data, num_questions, num_students):
     n = len(data["question_id"])
+
     sparse = np.empty((num_students, num_questions))
     sparse.fill(np.nan)
     weights = np.zeros((num_students, num_questions))
+
     idx = np.random.choice(n, n)
     for id in idx:
         sparse[data["user_id"][id], data["question_id"][id]] = \
             data["is_correct"][id]
         weights[data["user_id"][id], data["question_id"][id]] += 1
-
-    print(weights[np.where(weights>1)])
 
     return csr_matrix(sparse), csr_matrix(weights)
 
@@ -93,9 +95,9 @@ def main():
     third_predictor = IRTPredictor(train_data, num_questions, num_students)
 
     # Train Predictors
-    first_predictor.train(lr=0.001, iterations=3)
-    second_predictor.train(lr=0.001, iterations=3)
-    third_predictor.train(lr=0.001, iterations=3)
+    first_predictor.train(lr=0.01, iterations=20)
+    second_predictor.train(lr=0.01, iterations=20)
+    third_predictor.train(lr=0.01, iterations=20)
 
     # Evaluate Predictors
     predictions = evaluate(val_data,

@@ -136,10 +136,10 @@ def weighted_update_theta_beta(sparse_matrix, lr, theta, beta, weights):
         theta += lr * dl_dtheta
 
         sig_diff_mat2 = sigmoid(_difference_matrix(sparse_matrix, theta,
-                                                   beta)) * observation_weights
+                                                   beta))
         sig_diff_mat2 = remove_nan_indices(sparse_matrix, sig_diff_mat2)
         dl_dbeta = (-np.sum(C * observation_weights, axis=0) + np.sum(
-            sig_diff_mat2, axis=0))
+            sig_diff_mat2 * observation_weights, axis=0))
         beta += lr * dl_dbeta
 
     #####################################################################
