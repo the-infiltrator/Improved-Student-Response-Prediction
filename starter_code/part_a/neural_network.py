@@ -12,8 +12,7 @@ import torch
 import matplotlib.pyplot as plt
 
 # Set seed as the date of training and model evaluation
-print("seed set")
-np.random.seed(20201128)
+SEED = 20201128
 
 
 def load_data(base_path="../data"):
@@ -89,7 +88,7 @@ class AutoEncoder(nn.Module):
 
 
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
-          metrics, k):
+          metrics, k, latent, valid_matrix, zero_valid_matrix):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -135,16 +134,44 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
+        val_loss = get_loss(model, valid_matrix, zero_valid_matrix)
 
         # Update Metrics
-        metrics["k"][k]["Training Cost"].append(train_loss)
-        metrics["k"][k]["Validation Accuracy"].append(valid_acc)
+        if latent:
+            metrics["k"][k]["Training Cost"].append(train_loss)
+            metrics["k"][k]["Validation Accuracy"].append(valid_acc)
+            metrics["k"][k]["Validation Cost"].append(val_loss)
+        else:
+            metrics["lambda"][lamb]["Training Cost"].append(train_loss)
+            metrics["lambda"][lamb]["Validation Accuracy"].append(valid_acc)
+            metrics["lambda"][lamb]["Validation Cost"].append(val_loss)
 
         print("Epoch: {} \tTraining Cost: {:.6f}\t "
-              "Valid Acc: {} \n".format(epoch, train_loss, valid_acc))
+              "Valid Acc: {} \tValid Cost: {:.6f}".format(epoch, train_loss,
+                                                          valid_acc,
+                                                          val_loss))
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
+
+
+def get_loss(model, matrix, zero_matrix):
+    num_student = matrix.shape[0]
+    total_loss = 0
+    for user_id in range(num_student):
+        inputs = Variable(zero_matrix[user_id]).unsqueeze(0)
+        target = inputs.clone()
+
+        output = model(inputs)
+
+        # Mask the target to only compute the gradient of valid entries.
+        nan_mask = np.isnan(matrix[user_id].unsqueeze(0).numpy())
+        target[0][nan_mask] = output[0][nan_mask]
+
+        loss = torch.sum((output - target) ** 2.)
+
+        total_loss += loss.item()
+    return total_loss
 
 
 def evaluate(model, train_data, valid_data):
@@ -170,6 +197,7 @@ def evaluate(model, train_data, valid_data):
         if guess == valid_data["is_correct"][i]:
             correct += 1
         total += 1
+
     return correct / float(total)
 
 
@@ -189,87 +217,185 @@ def get_plots(metrics):
         plt.show()
 
 
-def gen_tuning_plots(metrics, k_values, lr):
+def gen_optimal_k_plots(metrics, values, lr, metric):
     plt.style.use('ggplot')
     plt.style.use('seaborn-paper')
-    plt.subplots(1, 5, figsize=(60, 3.5), tight_layout=True)
-    for i in range(len(k_values)):
-        data = metrics["k"][k_values[i]]
-        plt.subplot(1, 5, i + 1)
-        plt.title(f'Accuracy for k = {str(k_values[i])} and α = {lr}')
+    plt.subplots(1, 2, figsize=(60, 3.5), tight_layout=True)
+    for i in range(len(values)):
+        data = metrics[metric][values[i]]
+        plt.subplot(1, 2, i + 1)
+        plt.title(f'Accuracy for k = {str(values[i])} and α = {lr}')
         plt.xlabel('Number of Epochs')
         plt.ylabel('Validation Accuracy')
-        # print(data["Validation Accuracy"])
-        plt.plot(np.array(data["Validation Accuracy"]), color="darkcyan", label="Validation Set")
-        # plt.plot(evaluation_stats[lamb_vals[i - 1]][0]["Cross-Entropy"], color="firebrick", label="Training Set")
+
+        plt.plot(np.array(data["Validation Accuracy"]), color="darkcyan",
+                 label="Validation Set")
+
         plt.legend(loc="upper left")
     plt.show()
 
 
+def plot_costs(metrics, optimal_k):
+    """
+    Plot the accuracy on the validation data as a function of k.
+
+    :param k_set: array of k values
+    :param accuracy_set: array of validation accuracy for each k
+    :return: None
+    """
+    plt.style.use('ggplot')
+    plt.style.use('seaborn-paper')
+
+    plt.xlabel('Epochs')
+    plt.ylabel('Training Cost')
+    plt.plot(metrics["k"][optimal_k]["Training Cost"], color="darkcyan", marker='o')
+    plt.savefig("plots/autoencoder_train.png")
+    plt.close()
+
+    plt.xlabel('Epochs')
+    plt.ylabel('Validation Cost')
+    plt.plot(metrics["k"][optimal_k]["Validation Cost"], color="darkcyan", marker='o')
+    plt.savefig("plots/autoencoder_validation.png")
+    plt.close()
+
+
+def gen_tuning_plots(metrics, values, lr, metric):
+    plt.style.use('ggplot')
+    plt.style.use('seaborn-paper')
+    plt.subplots(1, 5, figsize=(60, 3.5), tight_layout=True)
+    for i in range(len(values)):
+        data = metrics[metric][values[i]]
+        plt.subplot(1, 5, i + 1)
+        plt.title(f'Accuracy for k = {str(values[i])} and α = {lr}')
+        plt.xlabel('Number of Epochs')
+        plt.ylabel('Validation Accuracy')
+
+        plt.plot(np.array(data["Validation Accuracy"]), color="darkcyan",
+                 label="Validation Set")
+
+        plt.legend(loc="upper left")
+    plt.show()
+
+
+def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
+    num_questions = data["zero_train_matrix"].shape[1]
+    for lamb in lamb_values:
+        model = AutoEncoder(num_question=num_questions, k=hyperparameters["k"])
+        metrics["lambda"][lamb] = {"Validation Cost": [], "Training Cost": [],
+                                   "Validation Accuracy": [],
+                                   "Test Accuracy": []}
+        train(model, hyperparameters["lr"], lamb,
+              data["train_matrix"], data["zero_train_matrix"],
+              data["valid_data"], hyperparameters["num_epoch"], metrics,
+              hyperparameters["k"], False, data["valid_matrix"],
+              data["zero_valid_matrix"])
+        metrics["lambda"][lamb]["Test Accuracy"].append(
+            evaluate(model, data["zero_train_matrix"], data["test_data"]))
+    best_values = [np.max([metrics["lambda"][lamb]["Validation Accuracy"]]) for
+                   lamb in lamb_values]
+    best_epochs = [np.argmax([metrics["lambda"][lamb]["Validation Accuracy"]])
+                   for lamb in
+                   lamb_values]
+    best_validation_acc = np.max((best_values))
+    best_epoch = best_epochs[best_values.index(best_validation_acc)]
+    best_lambda = lamb_values[best_values.index(best_validation_acc)]
+    print(best_values)
+    print(best_epochs)
+    print(
+        f'############################################################################################################################\n'
+        f'                                       EXPERIMENT COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, k = {hyperparameters["k"]}\n '
+        f'                                    Best  λ = {best_lambda}, Validation Accuracy = {best_validation_acc}\n '
+        f'############################################################################################################################\n')
+
+    # Generate side by side accuracy plots for each lamb
+    gen_tuning_plots(metrics, lamb_values, hyperparameters["lr"], "lambda")
+    return best_lambda
+
+
+def tune_latent_dim(data, k_values, metrics, hyperparameters):
+    num_questions = data["zero_train_matrix"].shape[1]
+    for k in k_values:
+        model = AutoEncoder(num_question=num_questions, k=k)
+        metrics["k"][k] = {"Validation Cost": [], "Training Cost": [],
+                           "Validation Accuracy": [], "Test Accuracy": []}
+        train(model, hyperparameters["lr"], hyperparameters["lamb"],
+              data["train_matrix"], data["zero_train_matrix"],
+              data["valid_data"], hyperparameters["num_epoch"], metrics, k,
+              True, data["valid_matrix"], data["zero_valid_matrix"])
+        metrics["k"][k]["Test Accuracy"].append(
+            evaluate(model, data["zero_train_matrix"], data["test_data"]))
+    best_values = [np.max([metrics["k"][k]["Validation Accuracy"]]) for k in
+                   k_values]
+    best_epochs = [np.argmax([metrics["k"][k]["Validation Accuracy"]]) for k in
+                   k_values]
+    best_validation_acc = np.max(best_values)
+    best_epoch = best_epochs[best_values.index(best_validation_acc)]
+    best_k = k_values[best_values.index(best_validation_acc)]
+    print(best_values)
+    print(best_epochs)
+    print(
+        f'############################################################################################################################\n'
+        f'                                       EXPERIMENT COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, λ = {hyperparameters["lamb"]}\n '
+        f'                                    Best k = {best_k}, Validation Accuracy = {best_validation_acc}\n '
+        f'############################################################################################################################\n')
+
+    # Generate side by side accuracy plots for each k
+    gen_tuning_plots(metrics, k_values, hyperparameters["lr"], "k")
+    return best_k
+
+
+def make_sparse(data, num_students, num_questions):
+    n = len(data["question_id"])
+
+    sparse = np.empty((num_students, num_questions))
+    sparse.fill(np.nan)
+
+    idx = np.random.choice(n, n)
+    for id in idx:
+        sparse[data["user_id"][id], data["question_id"][id]] = \
+            data["is_correct"][id]
+    zeros = sparse.copy()
+    zeros[np.isnan(sparse)] = 0
+
+    return torch.FloatTensor(sparse), torch.FloatTensor(zeros)
+
+
 def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
-    np.random.seed(311)
-    num_questions = zero_train_matrix.shape[1]
+    valid_matrix, zero_valid_matrix = make_sparse(valid_data,
+                                                  *zero_train_matrix.shape)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
     #####################################################################
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
-
+    data = {
+        "zero_train_matrix": zero_train_matrix,
+        "train_matrix": train_matrix,
+        "valid_data": valid_data,
+        "valid_matrix": valid_matrix,
+        "zero_valid_matrix": zero_valid_matrix,
+        "test_data": test_data
+    }
     # Set model hyperparameters.
     k_values = [10, 50, 100, 200, 500]
-    num_questions = zero_train_matrix.shape[1]
+    # k_values = [10, 50]
     metrics = {"k": {}, "lambda": {}}
 
-    # Set optimization hyperparameters.
-    lr = 0.021
-    num_epoch = 100
-    lamb = 0
-    for k in k_values:
-        model = AutoEncoder(num_question=num_questions, k=k)
-        metrics["k"][k] = {"Validation Cost": [], "Training Cost": [], "Validation Accuracy": [], "Test Accuracy": []}
-        train(model, lr, lamb, train_matrix, zero_train_matrix,
-              valid_data, num_epoch, metrics, k)
-        metrics["k"][k]["Test Accuracy"].append(evaluate(model, zero_train_matrix, test_data))
-    best_values = [np.max([metrics["k"][k]["Validation Accuracy"]]) for k in k_values]
-    best_validation_acc = np.max((best_values))
-    best_k = k_values[best_values.index(best_validation_acc)]
-    print(
-        f'############################################################################################################################\n'
-        f'                                       EXPERIMENT COMPLETE,  α = {lr},  Epochs = {num_epoch}, λ = {lamb}\n '
-        f'                                    Best  K = {best_k}, Validation Accuracy = {best_validation_acc}\n '
-        f'############################################################################################################################\n')
+    hyperparameters = {"lr": 0.021, "num_epoch": 25, "lamb": 0}
 
-    # Generate side by side accuracy plots for each k
-    gen_tuning_plots(metrics, k_values, lr)
+    k_star = tune_latent_dim(data, k_values, metrics, hyperparameters)
+    plot_costs(metrics, k_star)
 
     #####################################################################
     # TODO : Use chosen k* -best_k- to train model and plot training and validation #
     # objectives and compute test accuracy                              #
     #####################################################################
     #
-
-    # Tuning Shrinkage Parameter
-    # k_star = 10
-    # # # Set optimization hyperparameters.
-    # lr = 0.021
-    # num_epoch = 70
-    # lambda_values = [0, 0.001, 0.01, 0.1, 1]
-    # for lamb in lambda_values:
-    #     model = AutoEncoder(num_question=num_questions, k=k_star)
-    #     metrics["lambda"][lamb] = {"Cost": [], "Validation Accuracy": [], "Test Accuracy": []}
-    #     train(model, lr, lamb, train_matrix, zero_train_matrix,
-    #           valid_data, num_epoch, metrics, k_star)
-    #     metrics["lambda"][lamb]["Test Accuracy"].append(evaluate(model, zero_train_matrix, test_data))
-    #
-    # # get_plots(metrics)
-    # best_values = [np.max([metrics["lambda"][lamb]["Validation Accuracy"]]) for lamb in lambda_values]
-    # best_validation_acc = np.max((best_values))
-    # best_lamb = lambda_values[best_values.index(best_validation_acc)]
-    # print(
-    #     f'############################################################################################################################\n'
-    #     f'                                       EXPERIMENT COMPLETE,  α = {lr},  Epochs = {num_epoch}, k = {k}\n '
-    #     f'                Best λ = {best_lamb}, Final Validation Accuracy = {metrics["lambda"][best_lamb]["Validation Accuracy"][-1]}, Final Test Accuracy = {metrics["lambda"][best_lamb]["Test Accuracy"][-1]}\n '
-    #     f'############################################################################################################################\n')
+    # lamb_values = [0, 0.001, 0.01, 0.1, 1]
+    # hyperparameters["k"] = k_star
+    # tune_shrinkage(data, lamb_values, metrics, hyperparameters)
 
     #####################################################################
     #                       END OF YOUR CODE                            #
