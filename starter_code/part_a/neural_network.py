@@ -350,8 +350,7 @@ def make_sparse(data, num_students, num_questions):
     sparse = np.empty((num_students, num_questions))
     sparse.fill(np.nan)
 
-    idx = np.random.choice(n, n)
-    for id in idx:
+    for id in range(n):
         sparse[data["user_id"][id], data["question_id"][id]] = \
             data["is_correct"][id]
     zeros = sparse.copy()
