@@ -284,6 +284,28 @@ def run_check_grad_beta(sparse_matrix):
     print("diff beta=", diff)
 
 
+def gen_plots(theta, beta):
+    betas = [np.quantile(beta, q/100) for q in np.linspace(0, 100, num=5).astype(int)]
+    # theta = np.linspace(-5, 5, num=100)
+    print(min(theta), max(theta))
+    theta = np.sort(theta)
+    probabilities = []
+    # [684, 559, 1653, 1216, 835]
+    for i, beta_j in enumerate(betas):
+        # beta_j = beta[question]
+        probabilities.append(sigmoid(theta - beta_j))
+
+    plt.style.use('ggplot')
+    plt.style.use('seaborn-paper')
+    plt.xlabel('Theta')
+    plt.ylabel('p(c_{ij}=1)')
+    colors = ["red", "blue", "orange", "green", "purple"]
+
+    for i in range(len(probabilities)):
+        plt.plot(theta, probabilities[i], color=colors[i])
+    plt.show()
+
+
 def plot_costs(val_c, training_c):
     """
     Plot the accuracy on the validation data as a function of k.
@@ -323,9 +345,11 @@ def main():
     run_check_grad_beta(sparse_matrix[:50, :75])
 
     theta, beta, val_acc, val_loss_lst, training_loss_lst = irt(sparse_matrix, val_data, 0.01, 280)
-
+    # theta, beta, val_acc, val_loss_lst, training_loss_lst = irt(sparse_matrix,
+    #                                                             val_data, 0.01,
+    #                                                             25)
     # Make training plots
-    plot_costs(val_loss_lst, training_loss_lst)
+    # plot_costs(val_loss_lst, training_loss_lst)
 
     #####################################################################
     #                       END OF YOUR CODE                            #
@@ -341,6 +365,7 @@ def main():
         f'###################################################################################\n')
 
     #####################################################################
+    gen_plots(theta, beta)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
