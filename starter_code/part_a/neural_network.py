@@ -12,7 +12,7 @@ import torch
 import matplotlib.pyplot as plt
 
 # Set seed as the date of training and model evaluation
-SEED = 20201128
+np.random.seed(20201128)
 
 
 def load_data(base_path="../data"):
@@ -109,7 +109,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
     print(
-        f"#########################################################################################\n"
+        f"\n#########################################################################################\n"
         f"                        FITTING AUTO-ENCODER : λ = {lamb}, k = {k}, α = {lr}         \n"
         f"#########################################################################################\n")
     for epoch in range(0, num_epoch):
@@ -248,14 +248,14 @@ def plot_costs(metrics, optimal_k):
 
     plt.xlabel('Epochs')
     plt.ylabel('Training Cost')
-    plt.plot(metrics["k"][optimal_k]["Training Cost"], color="darkcyan", marker='o')
-    plt.savefig("plots/autoencoder_train.png")
+    plt.plot(metrics["k"][optimal_k]["Training Cost"], color="darkcyan")
+    plt.savefig("autoencoder_train.png")
     plt.close()
 
     plt.xlabel('Epochs')
     plt.ylabel('Validation Cost')
-    plt.plot(metrics["k"][optimal_k]["Validation Cost"], color="darkcyan", marker='o')
-    plt.savefig("plots/autoencoder_validation.png")
+    plt.plot(metrics["k"][optimal_k]["Validation Cost"], color="firebrick")
+    plt.savefig("autoencoder_validation.png")
     plt.close()
 
 
@@ -278,6 +278,10 @@ def gen_tuning_plots(metrics, values, lr, metric):
 
 
 def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
+    print(
+        f'############################################################################################################################\n'
+        f'                                                  TUNING SHRINKAGE PARAMETER   \n '
+        f'############################################################################################################################\n')
     num_questions = data["zero_train_matrix"].shape[1]
     for lamb in lamb_values:
         model = AutoEncoder(num_question=num_questions, k=hyperparameters["k"])
@@ -299,10 +303,10 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
     best_validation_acc = np.max((best_values))
     best_epoch = best_epochs[best_values.index(best_validation_acc)]
     best_lambda = lamb_values[best_values.index(best_validation_acc)]
-    print(best_values)
-    print(best_epochs)
+    # print(best_values)
+    # print(best_epochs)
     print(
-        f'############################################################################################################################\n'
+        f'\n############################################################################################################################\n'
         f'                                       EXPERIMENT COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, k = {hyperparameters["k"]}\n '
         f'                                    Best  λ = {best_lambda}, Validation Accuracy = {best_validation_acc}\n '
         f'############################################################################################################################\n')
@@ -313,6 +317,10 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
 
 
 def tune_latent_dim(data, k_values, metrics, hyperparameters):
+    print(
+        f'############################################################################################################################\n'
+        f'                                                  TUNING LATENT DIMENSION                                                  \n'
+        f'############################################################################################################################\n')
     num_questions = data["zero_train_matrix"].shape[1]
     for k in k_values:
         model = AutoEncoder(num_question=num_questions, k=k)
@@ -331,10 +339,10 @@ def tune_latent_dim(data, k_values, metrics, hyperparameters):
     best_validation_acc = np.max(best_values)
     best_epoch = best_epochs[best_values.index(best_validation_acc)]
     best_k = k_values[best_values.index(best_validation_acc)]
-    print(best_values)
-    print(best_epochs)
+    # print(best_values)
+    # print(best_epochs)
     print(
-        f'############################################################################################################################\n'
+        f'\n############################################################################################################################\n'
         f'                                       EXPERIMENT COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, λ = {hyperparameters["lamb"]}\n '
         f'                                    Best k = {best_k}, Validation Accuracy = {best_validation_acc}\n '
         f'############################################################################################################################\n')
@@ -363,8 +371,6 @@ def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
     valid_matrix, zero_valid_matrix = make_sparse(valid_data,
                                                   *zero_train_matrix.shape)
-    np.random.seed(SEED)
-    torch.manual_seed(SEED)
     #####################################################################
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
@@ -382,16 +388,15 @@ def main():
     # k_values = [10, 50]
     metrics = {"k": {}, "lambda": {}}
 
-    hyperparameters = {"lr": 0.021, "num_epoch": 25, "lamb": 0}
+    hyperparameters = {"lr": 0.021, "num_epoch": 100, "lamb": 0}
 
     k_star = tune_latent_dim(data, k_values, metrics, hyperparameters)
     plot_costs(metrics, k_star)
 
     #####################################################################
-    # TODO : Use chosen k* -best_k- to train model and plot training and validation #
     # objectives and compute test accuracy                              #
     #####################################################################
-    #
+
     # lamb_values = [0, 0.001, 0.01, 0.1, 1]
     # hyperparameters["k"] = k_star
     # tune_shrinkage(data, lamb_values, metrics, hyperparameters)
