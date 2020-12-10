@@ -4,6 +4,7 @@ from check_grad import check_grad
 import numpy as np
 from sklearn.utils import resample
 from scipy.sparse import csr_matrix
+import matplotlib.pyplot as plt
 
 
 def sigmoid(x):
@@ -51,7 +52,6 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
     :return: float
     """
     #####################################################################
-    # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
     C = np.nan_to_num(sparse_matrix.toarray())
@@ -87,7 +87,6 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
     """
 
     #####################################################################
-    # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
     C = np.nan_to_num(sparse_matrix.toarray())
@@ -107,6 +106,16 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
     #                       END OF YOUR CODE                            #
     #####################################################################
     return theta, beta
+
+
+def make_sparse(data, num_students, num_questions):
+    n = len(data["question_id"])
+    sparse = np.empty((num_students, num_questions))
+    sparse.fill(np.nan)
+    for id in range(n):
+        sparse[data["user_id"][id], data["question_id"][id]] = \
+            data["is_correct"][id]
+    return csr_matrix(sparse)
 
 
 def weighted_neg_log_liklihood(sparse_matrix, theta, beta, weights):
@@ -155,6 +164,7 @@ def weighted_train(sparse_matrix, theta, beta, weights, lr, iterations):
                                                  weights)
     return theta, beta
 
+
 def train(sparse_matrix, theta, beta, weights, lr, iterations):
     for i in range(iterations):
         print(f"IRT: Iteration #{i + 1}")
@@ -193,19 +203,26 @@ def irt(sparse_matrix, val_data, lr, iterations):
     :param iterations: int
     :return: (theta, beta, val_acc_lst)
     """
+    print(
+        f"#########################################################################################\n"
+        f"                         TRAINING ITEM RESPONSE THEORY MODEL                                \n"
+        f"#########################################################################################\n")
     theta = np.zeros(sparse_matrix.shape[0])
     beta = np.zeros(sparse_matrix.shape[1])
-
-    val_acc_lst = []
-
+    valid_matrix = make_sparse(val_data, *sparse_matrix.shape)
+    val_loss_lst = []
+    training_loss_lst = []
+    val_acc = []
     for i in range(iterations):
         neg_lld = neg_log_likelihood(sparse_matrix, theta=theta, beta=beta)
+        training_loss_lst.append(neg_lld)
+        val_loss_lst.append(neg_log_likelihood(valid_matrix, theta=theta, beta=beta))
         score = evaluate(data=val_data, theta=theta, beta=beta)
-        val_acc_lst.append(score)
-        print("NLLK: {} \t Score: {}".format(neg_lld, score))
+        val_acc.append(score)
+        print(f"Iteration: {i} NLLK: {neg_lld} \t Score: {score}")
         theta, beta = update_theta_beta(sparse_matrix, lr, theta, beta)
 
-    return theta, beta, val_acc_lst
+    return theta, beta, val_acc, val_loss_lst, training_loss_lst
 
 
 def evaluate(data, theta, beta):
@@ -267,32 +284,63 @@ def run_check_grad_beta(sparse_matrix):
     print("diff beta=", diff)
 
 
+def plot_costs(val_c, training_c):
+    """
+    Plot the accuracy on the validation data as a function of k.
+
+    :param k_set: array of k values
+    :param accuracy_set: array of validation accuracy for each k
+    :return: None
+    """
+    plt.style.use('ggplot')
+    plt.style.use('seaborn-paper')
+
+    plt.xlabel('Iterations')
+    plt.ylabel('Training Log-Likelihood')
+    plt.plot(range(len(training_c)), training_c, color="darkcyan")
+    plt.savefig("irt_train.png")
+    plt.close()
+
+    plt.xlabel('Iterations')
+    plt.ylabel('Validation Log-Likelihood')
+    plt.plot(range(len(val_c)), val_c, color="firebrick")
+    plt.savefig("irt_validation.png")
+    plt.close()
+
+
 def main():
     train_data = load_train_csv("../data")
     # You may optionally use the sparse matrix.
     sparse_matrix = load_train_sparse("../data")
     val_data = load_valid_csv("../data")
+
     test_data = load_public_test_csv("../data")
     # #####################################################################
-    # # TODO:                                                             #
     # # Tune learning rate and number of iterations. With the implemented #
     # # code, report the validation and test accuracy.                    #
     # #####################################################################
     run_check_grad_theta(sparse_matrix[:50, :75])
     run_check_grad_beta(sparse_matrix[:50, :75])
-    irt(sparse_matrix, val_data, 0.001, 100)
-    # weights = np.copy(sparse_matrix.toarray())
-    # weights[~np.isnan(weights)] = 1
-    # weights[np.isnan(weights)] = 0
-    # weighted_irt(sparse_matrix, val_data, 0.001, 100, csr_matrix(weights))
+
+    theta, beta, val_acc, val_loss_lst, training_loss_lst = irt(sparse_matrix, val_data, 0.01, 280)
+
+    # Make training plots
+    plot_costs(val_loss_lst, training_loss_lst)
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
     #####################################################################
-    # TODO:                                                             #
     # Implement part (c)                                                #
+
+    print(
+        f'\n###################################################################################\n'
+        f'                                TRAINING COMPLETE                                  \n'
+        f'                     Final Validation Accuracy = {val_acc[-1]}\n'
+        f'                     Final Test Accuracy = {evaluate(test_data, theta, beta)} \n'
+        f'###################################################################################\n')
+
     #####################################################################
-    pass
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
