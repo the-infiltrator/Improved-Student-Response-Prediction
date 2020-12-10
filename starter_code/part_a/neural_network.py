@@ -422,7 +422,7 @@ def main():
     hyperparameters = {"lr": 0.021, "num_epoch": 10, "lamb": 0}
 
     # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
-    best_epoch=10
+    best_epoch=1
     hyperparameters["num_epoch"] = best_epoch
 
     #####################################################################
@@ -447,9 +447,9 @@ def main():
     test_acc = evaluate(model, train_data=data["zero_train_matrix"],
                    valid_data=data["test_data"])
     print(
-        f'############################################################################################################################\n'
+        f'\n############################################################################################################################\n'
         f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, λ = {hyperparameters["lamb"]}\n '
-        f'                                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n '
+        f'                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
         f'############################################################################################################################\n')
 
     # lamb_values = [0, 0.001, 0.01, 0.1, 1]
@@ -470,9 +470,9 @@ def main():
     test_acc = evaluate(model, train_data=data["zero_train_matrix"],
                         valid_data=data["test_data"])
     print(
-        f'############################################################################################################################\n'
+        f'\n############################################################################################################################\n'
         f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, k = {k_star}\n '
-        f'                                        λ* = {l_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n '
+        f'                        λ* = {l_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
         f'############################################################################################################################\n')
 
     #####################################################################
