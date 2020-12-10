@@ -87,8 +87,39 @@ class AutoEncoder(nn.Module):
         return out
 
 
+def train_ensemble(model, lr, lamb, train_data, zero_train_data, num_epoch,
+                   weights):
+    model.train()
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    num_student = train_data.shape[0]
+    for epoch in range(0, num_epoch):
+        train_loss = 0.
+        for user_id in range(num_student):
+            inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
+            target = inputs.clone()
+
+            optimizer.zero_grad()
+            output = model(inputs)
+
+            # Mask the target to only compute the gradient of valid entries.
+            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            target[0][nan_mask] = output[0][nan_mask]
+
+            required_weight = weights[user_id].unsqueeze(0)
+            required_weight[0][nan_mask] = 0
+
+            loss = torch.sum(
+                required_weight[0] * (output - target) ** 2.) + lamb / (
+                           2 * num_student) * model.get_weight_norm()
+            loss.backward()
+
+            train_loss += loss.item()
+            optimizer.step()
+        print("Epoch: {} \tTraining Cost: {:.6f}".format(epoch, train_loss))
+
+
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
-          metrics, k, latent, valid_matrix, zero_valid_matrix):
+          metrics, k, latent, valid_matrix, zero_valid_matrix, weights=None):
     """ Train the neural network, where the objective also includes
     a regularizer.
 
@@ -126,8 +157,12 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
             target[0][nan_mask] = output[0][nan_mask]
 
-            loss = torch.sum((output - target) ** 2.) + lamb / (
-                    2 * num_student) * model.get_weight_norm()
+            required_weight = weights[user_id].unsqueeze(0)
+            required_weight[0][nan_mask] = 0
+
+            loss = torch.sum(
+                required_weight[0] * (output - target) ** 2.) + lamb / (
+                           2 * num_student) * model.get_weight_norm()
             loss.backward()
 
             train_loss += loss.item()
@@ -150,6 +185,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
               "Valid Acc: {} \tValid Cost: {:.6f}".format(epoch, train_loss,
                                                           valid_acc,
                                                           val_loss))
+    return model
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -248,13 +284,15 @@ def plot_costs(metrics, optimal_k):
 
     plt.xlabel('Epochs')
     plt.ylabel('Training Cost')
-    plt.plot(metrics["k"][optimal_k]["Training Cost"], color="darkcyan", marker='o')
+    plt.plot(metrics["k"][optimal_k]["Training Cost"], color="darkcyan",
+             marker='o')
     plt.savefig("plots/autoencoder_train.png")
     plt.close()
 
     plt.xlabel('Epochs')
     plt.ylabel('Validation Cost')
-    plt.plot(metrics["k"][optimal_k]["Validation Cost"], color="darkcyan", marker='o')
+    plt.plot(metrics["k"][optimal_k]["Validation Cost"], color="darkcyan",
+             marker='o')
     plt.savefig("plots/autoencoder_validation.png")
     plt.close()
 
@@ -277,7 +315,7 @@ def gen_tuning_plots(metrics, values, lr, metric):
     plt.show()
 
 
-def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
+def tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights):
     num_questions = data["zero_train_matrix"].shape[1]
     for lamb in lamb_values:
         model = AutoEncoder(num_question=num_questions, k=hyperparameters["k"])
@@ -288,7 +326,7 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
               data["train_matrix"], data["zero_train_matrix"],
               data["valid_data"], hyperparameters["num_epoch"], metrics,
               hyperparameters["k"], False, data["valid_matrix"],
-              data["zero_valid_matrix"])
+              data["zero_valid_matrix"], weights)
         metrics["lambda"][lamb]["Test Accuracy"].append(
             evaluate(model, data["zero_train_matrix"], data["test_data"]))
     best_values = [np.max([metrics["lambda"][lamb]["Validation Accuracy"]]) for
@@ -312,7 +350,7 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters):
     return best_lambda
 
 
-def tune_latent_dim(data, k_values, metrics, hyperparameters):
+def tune_latent_dim(data, k_values, metrics, hyperparameters, weights):
     num_questions = data["zero_train_matrix"].shape[1]
     for k in k_values:
         model = AutoEncoder(num_question=num_questions, k=k)
@@ -321,7 +359,7 @@ def tune_latent_dim(data, k_values, metrics, hyperparameters):
         train(model, hyperparameters["lr"], hyperparameters["lamb"],
               data["train_matrix"], data["zero_train_matrix"],
               data["valid_data"], hyperparameters["num_epoch"], metrics, k,
-              True, data["valid_matrix"], data["zero_valid_matrix"])
+              True, data["valid_matrix"], data["zero_valid_matrix"], weights)
         metrics["k"][k]["Test Accuracy"].append(
             evaluate(model, data["zero_train_matrix"], data["test_data"]))
     best_values = [np.max([metrics["k"][k]["Validation Accuracy"]]) for k in
@@ -331,8 +369,6 @@ def tune_latent_dim(data, k_values, metrics, hyperparameters):
     best_validation_acc = np.max(best_values)
     best_epoch = best_epochs[best_values.index(best_validation_acc)]
     best_k = k_values[best_values.index(best_validation_acc)]
-    print(best_values)
-    print(best_epochs)
     print(
         f'############################################################################################################################\n'
         f'                                       EXPERIMENT COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, λ = {hyperparameters["lamb"]}\n '
@@ -341,7 +377,7 @@ def tune_latent_dim(data, k_values, metrics, hyperparameters):
 
     # Generate side by side accuracy plots for each k
     gen_tuning_plots(metrics, k_values, hyperparameters["lr"], "k")
-    return best_k
+    return best_k, best_epoch
 
 
 def make_sparse(data, num_students, num_questions):
@@ -365,6 +401,7 @@ def main():
                                                   *zero_train_matrix.shape)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
+    weights = torch.FloatTensor(np.ones(zero_train_matrix.shape))
     #####################################################################
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
@@ -382,22 +419,64 @@ def main():
     # k_values = [10, 50]
     metrics = {"k": {}, "lambda": {}}
 
-    hyperparameters = {"lr": 0.021, "num_epoch": 25, "lamb": 0}
+    hyperparameters = {"lr": 0.021, "num_epoch": 10, "lamb": 0}
 
-    k_star = tune_latent_dim(data, k_values, metrics, hyperparameters)
-    plot_costs(metrics, k_star)
+    # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
+    best_epoch=10
+    hyperparameters["num_epoch"] = best_epoch
 
     #####################################################################
     # TODO : Use chosen k* -best_k- to train model and plot training and validation #
     # objectives and compute test accuracy                              #
     #####################################################################
-    #
+    metrics = {"k": {}, "lambda": {}}
+    k_star = 10
+    metrics["k"][k_star] = {"Validation Cost": [], "Training Cost": [],
+                       "Validation Accuracy": [], "Test Accuracy": []}
+
+    model = train(
+        AutoEncoder(k=k_star, num_question=zero_valid_matrix.shape[1]),
+        hyperparameters["lr"], hyperparameters["lamb"],
+        data["train_matrix"], data["zero_train_matrix"],
+        data["valid_data"], hyperparameters["num_epoch"], metrics, k_star,
+        True, data["valid_matrix"], data["zero_valid_matrix"], weights)
+
+    plot_costs(metrics, k_star)
+    val_acc = evaluate(model, train_data=data["zero_train_matrix"],
+                        valid_data=data["valid_data"])
+    test_acc = evaluate(model, train_data=data["zero_train_matrix"],
+                   valid_data=data["test_data"])
+    print(
+        f'############################################################################################################################\n'
+        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, λ = {hyperparameters["lamb"]}\n '
+        f'                                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n '
+        f'############################################################################################################################\n')
+
     # lamb_values = [0, 0.001, 0.01, 0.1, 1]
     # hyperparameters["k"] = k_star
-    # tune_shrinkage(data, lamb_values, metrics, hyperparameters)
+    # l_star, best_epoch = tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights)
+    l_star = 0.001
+    hyperparameters["lamb"] = l_star
+    hyperparameters["num_epoch"] = best_epoch
+    model = train(
+        AutoEncoder(k=k_star, num_question=zero_valid_matrix.shape[1]),
+        hyperparameters["lr"], hyperparameters["lamb"],
+        data["train_matrix"], data["zero_train_matrix"],
+        data["valid_data"], hyperparameters["num_epoch"], metrics, k_star,
+        True, data["valid_matrix"], data["zero_valid_matrix"], weights)
+
+    val_acc = evaluate(model, train_data=data["zero_train_matrix"],
+                       valid_data=data["valid_data"])
+    test_acc = evaluate(model, train_data=data["zero_train_matrix"],
+                        valid_data=data["test_data"])
+    print(
+        f'############################################################################################################################\n'
+        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, k = {k_star}\n '
+        f'                                        λ* = {l_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n '
+        f'############################################################################################################################\n')
 
     #####################################################################
-    #                       END OF YOUR CODE                            #
+    #                       END OF YOUR CODE
     #####################################################################
 
 
