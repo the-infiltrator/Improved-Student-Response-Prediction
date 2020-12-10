@@ -29,7 +29,6 @@ class IRTPredictor(BaggedPredictor):
         super().__init__(data, num_questions, num_students)
         self.theta = np.zeros(num_students)
         self.beta = np.zeros(num_questions)
-        print(self.theta.shape, self.beta.shape)
 
     def train(self, **kwargs):
         self.theta, self.beta = item_response.weighted_train(self.data,
@@ -83,7 +82,7 @@ def evaluate(data, predictors):
 
 def main():
     # Get Data
-    np.random.seed(20201207)
+    np.random.seed(20201200)
     train_data = load_train_csv("../data")
     sparse_matrix = load_train_sparse("../data")
     val_data = load_valid_csv("../data")
@@ -95,17 +94,22 @@ def main():
     third_predictor = IRTPredictor(train_data, num_questions, num_students)
 
     # Train Predictors
-    first_predictor.train(lr=0.01, iterations=20)
-    second_predictor.train(lr=0.01, iterations=20)
-    third_predictor.train(lr=0.01, iterations=20)
+    first_predictor.train(lr=0.005, iterations=250)
+    second_predictor.train(lr=0.005, iterations=250)
+    third_predictor.train(lr=0.005, iterations=250)
 
     # Evaluate Predictors
-    predictions = evaluate(val_data,
+    val_acc = evaluate(val_data,
                            [first_predictor, second_predictor, third_predictor])
-    print(predictions)
-    predictions = evaluate(test_data,
+
+    test_acc = evaluate(test_data,
                            [first_predictor, second_predictor, third_predictor])
-    print(predictions)
+    print(
+        f'\n###################################################################################\n'
+        f'                                TRAINING COMPLETE                                  \n'
+        f'                     Final Validation Accuracy = {val_acc}\n'
+        f'                     Final Test Accuracy = {test_acc} \n'
+        f'###################################################################################\n')
 
 
 if __name__ == "__main__":
