@@ -114,12 +114,12 @@ def update_theta_beta_alpha(sparse_matrix, lr, theta, beta, alpha):
     for i in range(1):
         sig_diff_mat = sigmoid(_difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
         sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
-        dl_dtheta = (np.sum(C * alpha, axis=1) - np.sum(sig_diff_mat, axis=1))
+        dl_dtheta = (np.sum(C * alpha, axis=1) - np.sum(alpha * sig_diff_mat, axis=1))
         theta += lr * dl_dtheta
 
         sig_diff_mat2 = sigmoid(_difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
         sig_diff_mat2 = remove_nan_indices(sparse_matrix, sig_diff_mat2)
-        dl_dbeta = (-np.sum(C * alpha, axis=0) + np.sum(sig_diff_mat2, axis=0))
+        dl_dbeta = (-np.sum(C * alpha, axis=0) + np.sum(alpha * sig_diff_mat2, axis=0))
         beta += lr * dl_dbeta
 
         sig_diff_mat3 = sigmoid(
@@ -263,7 +263,7 @@ def check_grad_theta(theta, sparse_matrix, beta, alpha):
     sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
     # alpha_matrix = np.tile(alpha, (C.shape[0], 1))
     # alpha_matrix = remove_nan_indices(sparse_matrix, alpha_matrix)
-    dl_dtheta = (np.sum(C * alpha, axis=1) - np.sum(sig_diff_mat, axis=1))
+    dl_dtheta = (np.sum(C * alpha, axis=1) - np.sum(alpha * sig_diff_mat, axis=1))
     return ll, dl_dtheta
 
 
@@ -272,18 +272,20 @@ def check_grad_beta(beta, sparse_matrix, theta, alpha):
     C = np.nan_to_num(sparse_matrix.toarray())
     sig_diff_mat = sigmoid(_difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
     sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
-    dl_dbeta = (-np.sum(C * alpha, axis=0) + np.sum(sig_diff_mat, axis=0))
+    dl_dbeta = (-np.sum(C * alpha, axis=0) + np.sum(alpha*sig_diff_mat, axis=0))
     return ll, dl_dbeta
+
 
 def check_grad_alpha(alpha, sparse_matrix, theta, beta):
     ll = -neg_log_likelihood(sparse_matrix, theta, beta, alpha)
     C = np.nan_to_num(sparse_matrix.toarray())
     sig_diff_mat = sigmoid(_difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
-    sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
+    # sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
     diff_mat = _difference_matrix(sparse_matrix, theta, beta)
     diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
     sig_diff = diff_mat * sig_diff_mat
-    dl_dalpha = (np.sum(np.multiply(C, diff_mat), axis=0) - np.sum(sig_diff, axis=0))
+    sig_diff = remove_nan_indices(sparse_matrix, sig_diff)
+    dl_dalpha = (np.sum(C * diff_mat, axis=0) - np.sum(sig_diff, axis=0))
     return ll, dl_dalpha
 #
 #
@@ -313,7 +315,7 @@ def run_check_grad_beta(sparse_matrix):
     print("diff beta=", diff)
 
 def run_check_grad_alpha(sparse_matrix):
-    theta = np.zeros(sparse_matrix.shape[0])
+    theta = np.ones(sparse_matrix.shape[0])
     beta = np.zeros(sparse_matrix.shape[1])
     alpha = np.ones(sparse_matrix.shape[1])
     diff = check_grad(check_grad_alpha,
