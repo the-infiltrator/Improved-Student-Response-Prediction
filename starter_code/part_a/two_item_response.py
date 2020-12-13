@@ -1,4 +1,4 @@
-from utils import *
+from starter_code.utils import *
 from check_grad import check_grad
 import matplotlib.pyplot as plt
 import numpy as np
@@ -142,6 +142,64 @@ def train(sparse_matrix, theta, beta, alpha, weights, lr, iterations):
     return theta, beta, alpha
 
 
+def weighted_update_theta_beta_alpha(sparse_matrix, lr, theta, beta, alpha, weights):
+    """ Update theta and beta using gradient descent.
+
+    You are using alternating gradient descent. Your update should look:
+    for i in iterations ...
+        theta <- new_theta
+        beta <- new_beta
+        alpha <- new_alpha
+    You may optionally replace the function arguments to receive a matrix.
+
+    :param data: A dictionary {user_id: list, question_id: list,
+    is_correct: list}
+    :param lr: float
+    :param theta: Vector
+    :param beta: Vector
+    :param alpha: Vector
+    :return: tuple of vectors
+    """
+
+    #####################################################################
+    # TODO:                                                             #
+    # Implement the function as described in the docstring.             #
+    #####################################################################
+    C = np.nan_to_num(sparse_matrix.toarray())
+    observation_weights = weights.toarray()
+
+    for i in range(1):
+        sig_diff_mat = sigmoid(_difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
+        sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
+        dl_dtheta = (np.sum(C * alpha* observation_weights, axis=1) - np.sum(alpha * sig_diff_mat * observation_weights, axis=1))
+        theta += lr * dl_dtheta
+
+        sig_diff_mat2 = sigmoid(_difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
+        sig_diff_mat2 = remove_nan_indices(sparse_matrix, sig_diff_mat2)
+        dl_dbeta = (-np.sum(C * alpha * observation_weights, axis=0) + np.sum(alpha * sig_diff_mat2 * observation_weights, axis=0))
+        beta += lr * dl_dbeta
+
+        sig_diff_mat3 = sigmoid(
+            _difference_matrix_alpha(sparse_matrix, theta, beta, alpha))
+        sig_diff_mat3 = remove_nan_indices(sparse_matrix, sig_diff_mat3)
+        diff_mat = _difference_matrix(sparse_matrix, theta, beta)
+        diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
+        sig_diff = sig_diff_mat3 * diff_mat
+        dl_dalpha = (np.sum(C * diff_mat * observation_weights, axis=0) - np.sum(sig_diff * observation_weights, axis=0))
+        alpha += lr * dl_dalpha
+
+    #####################################################################
+    #                       END OF YOUR CODE                            #
+    #####################################################################
+    return theta, beta, alpha
+
+
+def weighted_train(sparse_matrix, theta, beta, alpha, weights, lr, iterations):
+    for i in range(iterations):
+        print(f"IRT: Iteration #{i + 1}")
+        theta, beta, alpha = weighted_update_theta_beta_alpha(sparse_matrix, lr, theta, beta, alpha, weights)
+    return theta, beta, alpha
+
 
 
 def irt(sparse_matrix, val_data, test_data, lr, iterations):
@@ -172,6 +230,7 @@ def irt(sparse_matrix, val_data, test_data, lr, iterations):
     beta = np.zeros(sparse_matrix.shape[1])
     alpha = np.ones(sparse_matrix.shape[1])
 
+    # alpha = np.random.normal(0, 1, sparse_matrix.shape[1])
     val_acc_lst = []
 
     for i in range(iterations):
@@ -351,6 +410,7 @@ def main():
     # n, bins, patches = plt.hist(theta)
     # plt.show()
 
+    # irt(sparse_matrix, val_data, 0.01, 250)
     # irt(sparse_matrix, val_data, 0.001, 1)
     # weights = np.copy(sparse_matrix.toarray())
 
