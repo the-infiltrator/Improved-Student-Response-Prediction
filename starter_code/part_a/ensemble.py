@@ -82,15 +82,17 @@ class TwoParamIRTPredictor(BaggedPredictor):
         self.alpha = np.ones(num_questions)
 
     def train(self, **kwargs):
-        self.theta, self.beta = two_item_response.weighted_train(self.data,
-                                                                 self.theta,
-                                                                 self.beta,
-                                                                 self.alpha,
-                                                                 self.weights,
-                                                                 **kwargs)
+        self.theta, self.beta, self.alpha = two_item_response.weighted_train(
+            self.data,
+            self.theta,
+            self.beta,
+            self.alpha,
+            self.weights,
+            **kwargs)
 
     def predict(self, data, question_id, user_id, sparse):
-        x = (self.alpha[question_id] * (self.theta[user_id] - self.beta[question_id])).sum()
+        x = (self.alpha[question_id] * (
+                    self.theta[user_id] - self.beta[question_id])).sum()
         p_a = item_response.sigmoid(x)
         return p_a
 
