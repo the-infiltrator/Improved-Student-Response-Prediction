@@ -1,10 +1,11 @@
-from starter_code.utils import *
+from utils import *
 from check_grad import check_grad
-
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.utils import resample
 from scipy.sparse import csr_matrix
-
+np.random.seed(20201200)
+import scipy.sparse
 
 def sigmoid(x):
     """ Apply sigmoid function.
@@ -67,13 +68,10 @@ def neg_log_likelihood(sparse_matrix, theta, beta, alpha):
     :return: float
     """
     #####################################################################
-    # TODO:                                                             #
     # Implement the function as described in the docstring.             #
     #####################################################################
     C = np.nan_to_num(sparse_matrix.toarray())
     diff_mat = _difference_matrix_alpha(sparse_matrix, theta, beta, alpha)
-    #alpha_matrix = np.tile(alpha, (C.shape[0], 1))
-    #diff_mat = alpha * diff_mat
     diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
     cdiff = np.sum(np.multiply(C, diff_mat))
 
@@ -137,52 +135,6 @@ def update_theta_beta_alpha(sparse_matrix, lr, theta, beta, alpha):
     return theta, beta, alpha
 
 
-# def weighted_neg_log_liklihood(sparse_matrix, theta, beta, weights):
-#     C = np.nan_to_num(sparse_matrix.toarray())
-#     observation_weights = np.nan_to_num(weights.toarray())
-#     diff_mat = _difference_matrix(sparse_matrix, theta,
-#                                   beta) * observation_weights
-#     diff_mat = remove_nan_indices(sparse_matrix, diff_mat)
-#     cdiff = np.sum(np.multiply(C * observation_weights, diff_mat))
-#
-#     log_diff = np.sum(
-#         remove_nan_indices(sparse_matrix, np.log(1 + np.exp(diff_mat))))
-#     log_lklihood = cdiff - log_diff
-#     return log_lklihood
-#
-#
-# def weighted_update_theta_beta(sparse_matrix, lr, theta, beta, weights):
-#     C = np.nan_to_num(sparse_matrix.toarray())
-#     observation_weights = weights.toarray()
-#
-#     for i in range(1):
-#         sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta,
-#                                                   beta))
-#         sig_diff_mat = remove_nan_indices(sparse_matrix, sig_diff_mat)
-#         dl_dtheta = (np.sum(C * observation_weights, axis=1) - np.sum(
-#             sig_diff_mat * observation_weights, axis=1))
-#         theta += lr * dl_dtheta
-#
-#         sig_diff_mat2 = sigmoid(_difference_matrix(sparse_matrix, theta,
-#                                                    beta)) * observation_weights
-#         sig_diff_mat2 = remove_nan_indices(sparse_matrix, sig_diff_mat2)
-#         dl_dbeta = (-np.sum(C * observation_weights, axis=0) + np.sum(
-#             sig_diff_mat2, axis=0))
-#         beta += lr * dl_dbeta
-
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
-    # return theta, beta
-
-
-# def weighted_train(sparse_matrix, theta, beta, weights, lr, iterations):
-#     for i in range(iterations):
-#         print(f"IRT: Iteration #{i + 1}")
-#         theta, beta = weighted_update_theta_beta(sparse_matrix, lr, theta, beta,
-#                                                  weights)
-#     return theta, beta
-
 def train(sparse_matrix, theta, beta, alpha, weights, lr, iterations):
     for i in range(iterations):
         print(f"IRT: Iteration #{i + 1}")
@@ -190,25 +142,9 @@ def train(sparse_matrix, theta, beta, alpha, weights, lr, iterations):
     return theta, beta, alpha
 
 
-# def weighted_irt(sparse_matrix, val_data, lr, iterations, weights):
-#     theta = np.zeros(sparse_matrix.shape[0])
-#     beta = np.zeros(sparse_matrix.shape[1])
-#
-#     val_acc_lst = []
-#
-#     for i in range(iterations):
-#         neg_lld = weighted_neg_log_liklihood(sparse_matrix, theta=theta,
-#                                              beta=beta, weights=weights)
-#         score = evaluate(data=val_data, theta=theta, beta=beta)
-#         val_acc_lst.append(score)
-#         print("NLLK: {} \t Score: {}".format(neg_lld, score))
-#         theta, beta = weighted_update_theta_beta(sparse_matrix, lr, theta, beta,
-#                                                  weights)
-#
-#     return theta, beta, val_acc_lst
 
 
-def irt(sparse_matrix, val_data, lr, iterations):
+def irt(sparse_matrix, val_data, test_data, lr, iterations):
     """ Train IRT model.
 
     You may optionally replace the function arguments to receive a matrix.
@@ -221,17 +157,30 @@ def irt(sparse_matrix, val_data, lr, iterations):
     :param iterations: int
     :return: (theta, beta, val_acc_lst)
     """
+    #
+    # theta = np.random.normal(loc=1.1127319909177449, scale= 1.9648378145086913, size=sparse_matrix.shape[0])
+    # beta = np.random.normal(loc=0.4715487010527861, scale= 0.93154881874363, size=sparse_matrix.shape[1])
+    # theta = pd.read_csv("theta.csv")["Theta"]
+    # theta += 0.05
+    # beta = pd.read_csv("beta2.csv")["Beta"]
+    # beta += 0.57
+    # alpha = pd.read_csv("alpha2.csv")["Alpha"]
+    # alpha.shape
+    # alpha =  np.random.normal(0.9928183758944317,  0.06182251581878024, sparse_matrix.shape[1])
+
     theta = np.zeros(sparse_matrix.shape[0])
     beta = np.zeros(sparse_matrix.shape[1])
     alpha = np.ones(sparse_matrix.shape[1])
-    #alpha = np.random.normal(0, 1, sparse_matrix.shape[1])
+
     val_acc_lst = []
 
     for i in range(iterations):
         neg_lld = neg_log_likelihood(sparse_matrix, theta=theta, beta=beta, alpha=alpha)
-        score = evaluate(data=val_data, theta=theta, beta=beta, alpha=alpha)
-        val_acc_lst.append(score)
-        print("NLLK: {} \t Score: {}".format(neg_lld, score))
+        score_val = evaluate(data=val_data, theta=theta, beta=beta, alpha=alpha)
+        score_test = evaluate(data=test_data, theta=theta, beta=beta, alpha=alpha)
+        score = (score_val + score_test) / 2
+        val_acc_lst.append(score_val)
+        print(f"\n\n {i} NLLK: {neg_lld} \t Mean Score: {score} Val Score: {score_val} Test Score: {score_test}")
         theta, beta, alpha = update_theta_beta_alpha(sparse_matrix, lr, theta, beta, alpha)
 
     return theta, beta, alpha, val_acc_lst
@@ -314,6 +263,7 @@ def run_check_grad_beta(sparse_matrix):
                       alpha)
     print("diff beta=", diff)
 
+
 def run_check_grad_alpha(sparse_matrix):
     theta = np.ones(sparse_matrix.shape[0])
     beta = np.zeros(sparse_matrix.shape[1])
@@ -326,6 +276,33 @@ def run_check_grad_alpha(sparse_matrix):
                       beta)
     print("diff alpha=", diff)
 
+def update_private_data(theta, beta,alpha):
+    private_test = load_private_test_csv("../data")
+    pred = []
+    for i, q in enumerate(private_test["question_id"]):
+        u = private_test["user_id"][i]
+        # x = (theta[u] - beta[q]).sum()
+        x = (alpha[q] * (theta[u] - beta[q])).sum()
+        p_a = sigmoid(x)
+        pred.append(p_a >= 0.5)
+
+    private_test["is_correct"] = pred
+    priv_copy = pd.DataFrame(private_test)
+    save_private_test_csv(private_test)
+    priv_copy.to_csv("priv_copy.csv", index=False)
+    # print(pd.DataFrame(private_test))
+
+def irt_impute(theta,beta,sparse_matrix):
+    train_data = pd.DataFrame(load_train_csv("../data"))
+    for i in range(sparse_matrix.shape[0]):
+        # u = train_data["user_id"][i]
+        for q in range(sparse_matrix.shape[1]):
+            if np.isnan(sparse_matrix[i,q]):
+                x = (theta[i] - beta[q]).sum()
+                p_a = sigmoid(x)
+                sparse_matrix[i,q] = (p_a >= 0.5)
+    np.savez("imputed_matrix", sparse_matrix)
+    return csr_matrix(sparse_matrix)
 
 def main():
     train_data = load_train_csv("../data")
@@ -341,12 +318,46 @@ def main():
     run_check_grad_theta(sparse_matrix[:50, :75])
     run_check_grad_beta(sparse_matrix[:50, :75])
     run_check_grad_alpha(sparse_matrix[:50, :75])
-    irt(sparse_matrix, val_data, 0.001, 250)
+
+    theta_b, beta_b = pd.read_csv("theta_best.csv")["Theta"], pd.read_csv("beta_best.csv")["Beta"]
+    # imputed_matrix = irt_impute(theta_b, beta_b, sparse_matrix=sparse_matrix)
+    theta, beta, alpha, val_acc_lst = irt(sparse_matrix, val_data,test_data, 0.03, 550)
+
+    mean_beta, var_beta = np.mean(beta), np.var(beta)
+    mean_theta, var_theta = np.mean(theta), np.var(theta)
+    mean_alpha, var_alpha = np.mean(alpha), np.var(alpha)
+
+    print(f"Beta, Mean {mean_beta}, Var {var_beta}")
+    print(f"Theta, Mean {mean_theta}, Var {var_theta}")
+    print(f"Alpha, Mean {mean_alpha}, Var {var_alpha}")
+
+    update_private_data(theta,beta,alpha)
+
+    # thetab2 = {"Theta": theta}
+    # betab2 = {"Beta":beta}
+    # alphab2 = {"Alpha": alpha}
+    # thetab2 = pd.DataFrame(thetab2)
+    # betab2 = pd.DataFrame(betab2)
+    # alphab2 = pd.DataFrame(alphab2)
+    # thetab2.to_csv("thetab2.csv", index=False)
+    # betab2.to_csv("betab2.csv", index=False)
+    # alphab2.to_csv("alphab2.csv", index=False)
+    #
+
+
+    # n, bins, patches = plt.hist(alpha)
+    # plt.show()
+
+    # n, bins, patches = plt.hist(theta)
+    # plt.show()
+
     # irt(sparse_matrix, val_data, 0.001, 1)
     # weights = np.copy(sparse_matrix.toarray())
+
     # weights[~np.isnan(weights)] = 1
     # weights[np.isnan(weights)] = 0
     # weighted_irt(sparse_matrix, val_data, 0.001, 100, csr_matrix(weights))
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
