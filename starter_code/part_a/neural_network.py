@@ -302,7 +302,7 @@ def gen_tuning_plots(metrics, values, lr, metric):
     for i in range(len(values)):
         data = metrics[metric][values[i]]
         plt.subplot(1, 5, i + 1)
-        plt.title(f'Accuracy for k = {str(values[i])} and α = {lr}')
+        plt.title(f'Accuracy for {metric} = {str(values[i])} and α = {lr}')
         plt.xlabel('Number of Epochs')
         plt.ylabel('Validation Accuracy')
 
