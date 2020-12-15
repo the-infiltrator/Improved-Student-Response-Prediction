@@ -2,16 +2,14 @@ from utils import *
 from check_grad import check_grad
 
 import numpy as np
-from sklearn.utils import resample
 from scipy.sparse import csr_matrix
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def sigmoid(x):
     """ Apply sigmoid function.
     """
-    # return np.exp(x) / (1 + np.exp(x))
-    # return 1 / (1 + np.exp(-x))
     return np.exp(-np.logaddexp(0, -x))
 
 
@@ -43,10 +41,7 @@ def remove_nan_indices(sparse_matrix, matrix):
 def neg_log_likelihood(sparse_matrix, theta, beta):
     """ Compute the negative log-likelihood.
 
-    You may optionally replace the function arguments to receive a matrix.
-
-    :param data: A dictionary {user_id: list, question_id: list,
-    is_correct: list}
+    :param sparse_matrix: a sparse matrix of student responses
     :param theta: Vector
     :param beta: Vector
     :return: float
@@ -70,13 +65,6 @@ def neg_log_likelihood(sparse_matrix, theta, beta):
 
 def update_theta_beta(sparse_matrix, lr, theta, beta):
     """ Update theta and beta using gradient descent.
-
-    You are using alternating gradient descent. Your update should look:
-    for i in iterations ...
-        theta <- new_theta
-        beta <- new_beta
-
-    You may optionally replace the function arguments to receive a matrix.
 
     :param data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
@@ -109,6 +97,10 @@ def update_theta_beta(sparse_matrix, lr, theta, beta):
 
 
 def make_sparse(data, num_students, num_questions):
+    """
+    Converts the dictionary format of the data to a sparse matrix of
+    observations.
+    """
     n = len(data["question_id"])
     sparse = np.empty((num_students, num_questions))
     sparse.fill(np.nan)
@@ -119,6 +111,14 @@ def make_sparse(data, num_students, num_questions):
 
 
 def weighted_neg_log_liklihood(sparse_matrix, theta, beta, weights):
+    """
+    Compute the negative log-likelihood using the weights for each obsevation.
+
+    :param sparse_matrix: a sparse matrix of student responses
+    :param theta: Vector
+    :param beta: Vector
+    :return: float
+    """
     C = np.nan_to_num(sparse_matrix.toarray())
     observation_weights = np.nan_to_num(weights.toarray())
     diff_mat = _difference_matrix(sparse_matrix, theta,
@@ -133,6 +133,16 @@ def weighted_neg_log_liklihood(sparse_matrix, theta, beta, weights):
 
 
 def weighted_update_theta_beta(sparse_matrix, lr, theta, beta, weights):
+    """ Update theta and beta using gradient descent, and considering the
+    weights for each entry of the sparse matrix.
+
+    :param sparse_matrix: a sparse matrix of student responses
+    :param lr: float
+    :param theta: Vector
+    :param beta: Vector
+    :param weights: a matrix of weights for each entry
+    :return: tuple of vectors
+    """
     C = np.nan_to_num(sparse_matrix.toarray())
     observation_weights = weights.toarray()
 
@@ -158,6 +168,9 @@ def weighted_update_theta_beta(sparse_matrix, lr, theta, beta, weights):
 
 
 def weighted_train(sparse_matrix, theta, beta, weights, lr, iterations):
+    """
+    Train IRT using weights
+    """
     for i in range(iterations):
         print(f"IRT: Iteration #{i + 1}")
         theta, beta = weighted_update_theta_beta(sparse_matrix, lr, theta, beta,
@@ -166,6 +179,10 @@ def weighted_train(sparse_matrix, theta, beta, weights, lr, iterations):
 
 
 def train(sparse_matrix, theta, beta, weights, lr, iterations):
+    """
+    Train IRT using hyperparameters
+    """
+    # TODO : Check if used
     for i in range(iterations):
         print(f"IRT: Iteration #{i + 1}")
         theta, beta = update_theta_beta(sparse_matrix, lr, theta, beta)
@@ -173,6 +190,15 @@ def train(sparse_matrix, theta, beta, weights, lr, iterations):
 
 
 def weighted_irt(sparse_matrix, val_data, lr, iterations, weights):
+    """ Train IRT model using weights for each observation.
+
+    :param sparse_matrix: a sparse matrix of student responses
+    :param val_data: A dictionary {user_id: list, question_id: list,
+    is_correct: list}
+    :param lr: float
+    :param iterations: int
+    :return: (theta, beta, val_acc_lst)
+    """
     theta = np.zeros(sparse_matrix.shape[0])
     beta = np.zeros(sparse_matrix.shape[1])
 
@@ -193,10 +219,7 @@ def weighted_irt(sparse_matrix, val_data, lr, iterations, weights):
 def irt(sparse_matrix, val_data, lr, iterations):
     """ Train IRT model.
 
-    You may optionally replace the function arguments to receive a matrix.
-
-    :param data: A dictionary {user_id: list, question_id: list,
-    is_correct: list}
+    :param sparse_matrix: a sparse matrix of student responses
     :param val_data: A dictionary {user_id: list, question_id: list,
     is_correct: list}
     :param lr: float
@@ -245,6 +268,9 @@ def evaluate(data, theta, beta):
 
 
 def check_grad_theta(theta, sparse_matrix, beta):
+    """
+    Function that calculates log likelihood and dl_dtheta
+    """
     ll = -neg_log_likelihood(sparse_matrix, theta, beta)
     C = np.nan_to_num(sparse_matrix.toarray())
     sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
@@ -254,6 +280,9 @@ def check_grad_theta(theta, sparse_matrix, beta):
 
 
 def check_grad_beta(beta, sparse_matrix, theta):
+    """
+    Function that calculates log likelihood and dl_dbeta
+    """
     ll = -neg_log_likelihood(sparse_matrix, theta, beta)
     C = np.nan_to_num(sparse_matrix.toarray())
     sig_diff_mat = sigmoid(_difference_matrix(sparse_matrix, theta, beta))
@@ -285,14 +314,16 @@ def run_check_grad_beta(sparse_matrix):
 
 
 def gen_plots(theta, beta):
-    betas = [np.quantile(beta, q/100) for q in np.linspace(0, 100, num=5).astype(int)]
-    # theta = np.linspace(-5, 5, num=100)
-    print(min(theta), max(theta))
+    """
+    Generate the plots of p(c_{ij}=1|theta,beta) for trained theta and beta
+    """
+    betas = np.random.choice(beta, 5)
+
     theta = np.sort(theta)
     probabilities = []
     # [684, 559, 1653, 1216, 835]
+
     for i, beta_j in enumerate(betas):
-        # beta_j = beta[question]
         probabilities.append(sigmoid(theta - beta_j))
 
     plt.style.use('ggplot')
@@ -302,7 +333,8 @@ def gen_plots(theta, beta):
     colors = ["red", "blue", "orange", "green", "purple"]
 
     for i in range(len(probabilities)):
-        plt.plot(theta, probabilities[i], color=colors[i])
+        plt.plot(theta, probabilities[i], color=colors[i], label=f"Question {beta.values.tolist().index(betas[i])+1}")
+    plt.legend(loc="upper left")
     plt.show()
 
 
@@ -344,10 +376,13 @@ def main():
     run_check_grad_theta(sparse_matrix[:50, :75])
     run_check_grad_beta(sparse_matrix[:50, :75])
 
-    theta, beta, val_acc, val_loss_lst, training_loss_lst = irt(sparse_matrix, val_data, 0.01, 280)
+    # theta, beta, val_acc, val_loss_lst, training_loss_lst = irt(sparse_matrix, val_data, 0.01, 280)
     # theta, beta, val_acc, val_loss_lst, training_loss_lst = irt(sparse_matrix,
     #                                                             val_data, 0.01,
     #                                                             25)
+    # TODO: Remove
+    theta = pd.read_csv("theta.csv")["Theta"]
+    beta = pd.read_csv("beta.csv")["Beta"]
     # Make training plots
     # plot_costs(val_loss_lst, training_loss_lst)
 
@@ -357,12 +392,12 @@ def main():
     #####################################################################
     # Implement part (c)                                                #
 
-    print(
-        f'\n###################################################################################\n'
-        f'                                TRAINING COMPLETE                                  \n'
-        f'                     Final Validation Accuracy = {val_acc[-1]}\n'
-        f'                     Final Test Accuracy = {evaluate(test_data, theta, beta)} \n'
-        f'###################################################################################\n')
+    # print(
+    #     f'\n###################################################################################\n'
+    #     f'                                TRAINING COMPLETE                                  \n'
+    #     f'                     Final Validation Accuracy = {val_acc[-1]}\n'
+    #     f'                     Final Test Accuracy = {evaluate(test_data, theta, beta)} \n'
+    #     f'###################################################################################\n')
 
     #####################################################################
     gen_plots(theta, beta)
