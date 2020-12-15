@@ -145,7 +145,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
         f"#########################################################################################\n")
     for epoch in range(0, num_epoch):
         train_loss = 0.
-
+        num_observations = 0
         for user_id in range(num_student):
             inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
             target = inputs.clone()
@@ -155,6 +155,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
 
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            num_observations += np.sum(
+                ~np.isnan(train_data[user_id].unsqueeze(0).numpy()))
+            # print(num_observations)
             target[0][nan_mask] = output[0][nan_mask]
 
             required_weight = weights[user_id].unsqueeze(0)
@@ -170,7 +173,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
         val_loss = get_loss(model, valid_matrix, zero_valid_matrix)
-
+        # average_train_loss = train_loss/num_observations
         # Update Metrics
         if latent:
             metrics["k"][k]["Training Cost"].append(train_loss)
@@ -194,6 +197,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
 def get_loss(model, matrix, zero_matrix):
     num_student = matrix.shape[0]
     total_loss = 0
+    # num_observations = 0
     for user_id in range(num_student):
         inputs = Variable(zero_matrix[user_id]).unsqueeze(0)
         target = inputs.clone()
@@ -202,6 +206,7 @@ def get_loss(model, matrix, zero_matrix):
 
         # Mask the target to only compute the gradient of valid entries.
         nan_mask = np.isnan(matrix[user_id].unsqueeze(0).numpy())
+        # num_observations += np.sum(~np.isnan(matrix[user_id].unsqueeze(0).numpy()))
         target[0][nan_mask] = output[0][nan_mask]
 
         loss = torch.sum((output - target) ** 2.)
@@ -315,9 +320,9 @@ def gen_tuning_plots(metrics, values, lr, metric):
 
 def tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights):
     print(
-        f'############################################################################################################################\n'
+        f'##########################################################################################################################\n'
         f'                                                  TUNING SHRINKAGE PARAMETER   \n '
-        f'############################################################################################################################\n')
+        f'##########################################################################################################################\n')
     num_questions = data["zero_train_matrix"].shape[1]
     for lamb in lamb_values:
         model = AutoEncoder(num_question=num_questions, k=hyperparameters["k"])
@@ -352,9 +357,9 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights):
 
 def tune_latent_dim(data, k_values, metrics, hyperparameters, weights):
     print(
-        f'############################################################################################################################\n'
+        f'##########################################################################################################################\n'
         f'                                                  TUNING LATENT DIMENSION                                                  \n'
-        f'############################################################################################################################\n')
+        f'##########################################################################################################################\n')
     num_questions = data["zero_train_matrix"].shape[1]
     for k in k_values:
         model = AutoEncoder(num_question=num_questions, k=k)
@@ -418,13 +423,13 @@ def main():
         "test_data": test_data
     }
     # Set model hyperparameters.
-    # k_values = [10, 50, 100, 200, 500]
+    k_values = [10, 50, 100, 200, 500]
     # # k_values = [10, 50]
-    # metrics = {"k": {}, "lambda": {}}
+    metrics = {"k": {}, "lambda": {}}
     #
     hyperparameters = {"lr": 0.021, "num_epoch": 100, "lamb": 0}
     #
-    # # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
+    # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
     # hyperparameters["num_epoch"] = 39
     #
     # #####################################################################
