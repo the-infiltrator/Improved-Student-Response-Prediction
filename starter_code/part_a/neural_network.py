@@ -352,7 +352,7 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights):
 
     # Generate side by side accuracy plots for each lamb
     gen_tuning_plots(metrics, lamb_values, hyperparameters["lr"], "lambda")
-    return best_lambda
+    return best_lambda, best_epoch
 
 
 def tune_latent_dim(data, k_values, metrics, hyperparameters, weights):
