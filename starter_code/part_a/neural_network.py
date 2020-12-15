@@ -424,47 +424,43 @@ def main():
     }
     # Set model hyperparameters.
     k_values = [10, 50, 100, 200, 500]
-    # # k_values = [10, 50]
     metrics = {"k": {}, "lambda": {}}
     #
     hyperparameters = {"lr": 0.021, "num_epoch": 100, "lamb": 0}
     #
-    # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
-    # hyperparameters["num_epoch"] = 39
+    k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
+    hyperparameters["k"] = k_star
+    hyperparameters["num_epoch"] = best_epoch
     #
-    # #####################################################################
-    # # objectives and compute test accuracy                              #
-    # #####################################################################
-    # metrics = {"k": {}, "lambda": {}}
-    # k_star = 10
-    # metrics["k"][k_star] = {"Validation Cost": [], "Training Cost": [],
-    #                    "Validation Accuracy": [], "Test Accuracy": []}
-    #
-    # model = train(
-    #     AutoEncoder(k=k_star, num_question=zero_valid_matrix.shape[1]),
-    #     hyperparameters["lr"], hyperparameters["lamb"],
-    #     data["train_matrix"], data["zero_train_matrix"],
-    #     data["valid_data"], hyperparameters["num_epoch"], metrics, k_star,
-    #     True, data["valid_matrix"], data["zero_valid_matrix"], weights)
-    #
-    # plot_costs(metrics, k_star)
-    # val_acc = evaluate(model, train_data=data["zero_train_matrix"],
-    #                     valid_data=data["valid_data"])
-    # test_acc = evaluate(model, train_data=data["zero_train_matrix"],
-    #                valid_data=data["test_data"])
-    # print(
-    #     f'\n############################################################################################################################\n'
-    #     f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, λ = {hyperparameters["lamb"]}\n '
-    #     f'                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
-    #     f'############################################################################################################################\n')
+    #####################################################################
+    # objectives and compute test accuracy                              #
+    #####################################################################
+    metrics = {"k": {}, "lambda": {}}
+    metrics["k"][k_star] = {"Validation Cost": [], "Training Cost": [],
+                       "Validation Accuracy": [], "Test Accuracy": []}
+
+    model = train(
+        AutoEncoder(k=k_star, num_question=zero_valid_matrix.shape[1]),
+        hyperparameters["lr"], hyperparameters["lamb"],
+        data["train_matrix"], data["zero_train_matrix"],
+        data["valid_data"], hyperparameters["num_epoch"], metrics, k_star,
+        True, data["valid_matrix"], data["zero_valid_matrix"], weights)
+
+    plot_costs(metrics, k_star)
+    val_acc = evaluate(model, train_data=data["zero_train_matrix"],
+                        valid_data=data["valid_data"])
+    test_acc = evaluate(model, train_data=data["zero_train_matrix"],
+                   valid_data=data["test_data"])
+    print(
+        f'\n############################################################################################################################\n'
+        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, λ = {hyperparameters["lamb"]}\n '
+        f'                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
+        f'############################################################################################################################\n')
     metrics = {"k": {}, "lambda": {}}
     lamb_values = [0, 0.001, 0.01, 0.1, 1]
-    hyperparameters["k"] = 10
-    k_star = 10
     l_star, best_epoch = tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights)
-    l_star = 0.001
     hyperparameters["lamb"] = l_star
-    hyperparameters["num_epoch"] = 39
+    hyperparameters["num_epoch"] = best_epoch
     model = train(
         AutoEncoder(k=k_star, num_question=zero_valid_matrix.shape[1]),
         hyperparameters["lr"], hyperparameters["lamb"],
