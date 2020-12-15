@@ -425,13 +425,13 @@ def main():
     # Set model hyperparameters.
     k_values = [10, 50, 100, 200, 500]
     metrics = {"k": {}, "lambda": {}}
-    #
+    # #
     hyperparameters = {"lr": 0.021, "num_epoch": 100, "lamb": 0}
-    #
-    k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
+    # #
+    # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
+    k_star = 50
     hyperparameters["k"] = k_star
-    hyperparameters["num_epoch"] = best_epoch
-    #
+    # #
     #####################################################################
     # objectives and compute test accuracy                              #
     #####################################################################
@@ -453,20 +453,22 @@ def main():
                    valid_data=data["test_data"])
     print(
         f'\n############################################################################################################################\n'
-        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, λ = {hyperparameters["lamb"]}\n '
+        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, λ = {hyperparameters["lamb"]}\n '
         f'                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
         f'############################################################################################################################\n')
     metrics = {"k": {}, "lambda": {}}
     lamb_values = [0, 0.001, 0.01, 0.1, 1]
-    l_star, best_epoch = tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights)
+    # hyperparameters["num_epoch"] = 100
+    # l_star, best_epoch = tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights)
+    l_star = 0.001
     hyperparameters["lamb"] = l_star
-    hyperparameters["num_epoch"] = best_epoch
+    # hyperparameters["num_epoch"] = best_epoch
     model = train(
         AutoEncoder(k=k_star, num_question=zero_valid_matrix.shape[1]),
         hyperparameters["lr"], hyperparameters["lamb"],
         data["train_matrix"], data["zero_train_matrix"],
         data["valid_data"], hyperparameters["num_epoch"], metrics, k_star,
-        True, data["valid_matrix"], data["zero_valid_matrix"], weights)
+        False, data["valid_matrix"], data["zero_valid_matrix"], weights)
 
     val_acc = evaluate(model, train_data=data["zero_train_matrix"],
                        valid_data=data["valid_data"])
@@ -474,7 +476,7 @@ def main():
                         valid_data=data["test_data"])
     print(
         f'\n############################################################################################################################\n'
-        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {hyperparameters["num_epoch"]}, k = {k_star}\n '
+        f'                                       TRAINING COMPLETE,  α = {hyperparameters["lr"]},  Epochs = {best_epoch}, k = {k_star}\n '
         f'                        λ* = {l_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
         f'############################################################################################################################\n')
 
