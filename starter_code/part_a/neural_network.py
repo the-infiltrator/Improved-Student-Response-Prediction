@@ -2,7 +2,6 @@ from utils import *
 from torch.autograd import Variable
 
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 
@@ -89,6 +88,18 @@ class AutoEncoder(nn.Module):
 
 def train_ensemble(model, lr, lamb, train_data, zero_train_data, num_epoch,
                    weights):
+    """ Train the neural network, where the objective also includes
+        a regularizer, using weights.
+
+        :param model: Module
+        :param lr: float
+        :param lamb: float
+        :param train_data: 2D FloatTensor
+        :param zero_train_data: 2D FloatTensor
+        :param valid_data: Dict
+        :param num_epoch: int
+        :return: None
+        """
     model.train()
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
@@ -195,6 +206,9 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
 
 
 def get_loss(model, matrix, zero_matrix):
+    """
+    Computes loss for model based on data in <matrix>
+    """
     num_student = matrix.shape[0]
     total_loss = 0
     # num_observations = 0
@@ -243,6 +257,9 @@ def evaluate(model, train_data, valid_data):
 
 
 def get_plots(metrics):
+    """
+    Plots required data as a function of epoch
+    """
     for k in metrics:
         data = metrics[k]
         fig, ax1 = plt.subplots()
@@ -259,6 +276,10 @@ def get_plots(metrics):
 
 
 def gen_optimal_k_plots(metrics, values, lr, metric):
+    """
+    Plots Validation Accuracy for the optimal latent dimensions as a function
+    of epoch.
+    """
     plt.style.use('ggplot')
     plt.style.use('seaborn-paper')
     plt.subplots(1, 2, figsize=(60, 3.5), tight_layout=True)
@@ -301,6 +322,10 @@ def plot_costs(metrics, optimal_k):
 
 
 def gen_tuning_plots(metrics, values, lr, metric):
+    """
+    Plots Validation Accuracy for the <metric> as a function
+    of epoch.
+    """
     plt.style.use('ggplot')
     plt.style.use('seaborn-paper')
     plt.subplots(1, 5, figsize=(60, 3.5), tight_layout=True)
@@ -319,6 +344,9 @@ def gen_tuning_plots(metrics, values, lr, metric):
 
 
 def tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights):
+    """
+    Tune lambda for <lamb_values> and return optimal hyperparameters.
+    """
     print(
         f'##########################################################################################################################\n'
         f'                                                  TUNING SHRINKAGE PARAMETER   \n '
@@ -356,6 +384,9 @@ def tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights):
 
 
 def tune_latent_dim(data, k_values, metrics, hyperparameters, weights):
+    """
+    Tune k for <lamb_values> and return optimal hyperparameters.
+    """
     print(
         f'##########################################################################################################################\n'
         f'                                                  TUNING LATENT DIMENSION                                                  \n'
@@ -390,6 +421,9 @@ def tune_latent_dim(data, k_values, metrics, hyperparameters, weights):
 
 
 def make_sparse(data, num_students, num_questions):
+    """
+    Converts data from dictionary format to FloatTensors.
+    """
     n = len(data["question_id"])
 
     sparse = np.empty((num_students, num_questions))
