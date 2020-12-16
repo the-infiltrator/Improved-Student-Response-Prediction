@@ -459,13 +459,11 @@ def main():
     # Set model hyperparameters.
     k_values = [10, 50, 100, 200, 500]
     metrics = {"k": {}, "lambda": {}}
-    # #
     hyperparameters = {"lr": 0.021, "num_epoch": 100, "lamb": 0}
-    # #
-    # k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
-    k_star = 50
+    k_star, best_epoch = tune_latent_dim(data, k_values, metrics, hyperparameters, weights)
+    # k_star = 50
     hyperparameters["k"] = k_star
-    best_epoch = 22
+    # best_epoch = 22
     hyperparameters["num_epoch"] = best_epoch
     # #
     #####################################################################
@@ -493,10 +491,9 @@ def main():
         f'                        k* = {k_star}, Test Accuracy = {test_acc}, Validation Accuracy = {val_acc}\n'
         f'##########################################################################################################################\n')
     lamb_values = [0, 0.001, 0.01, 0.1, 1]
-    # hyperparameters["num_epoch"] = 100
-    # l_star, best_epoch = tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights)
-    l_star = 0.001
-    best_epoch = 33
+    hyperparameters["num_epoch"] = 100
+    l_star, best_epoch = tune_shrinkage(data, lamb_values, metrics, hyperparameters, weights)
+
     metrics = {"k": {}, "lambda": {}}
     metrics["lambda"][l_star] = {"Validation Cost": [], "Training Cost": [],
                             "Validation Accuracy": [], "Test Accuracy": []}
