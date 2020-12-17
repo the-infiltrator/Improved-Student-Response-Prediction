@@ -92,7 +92,7 @@ def train_models(X, X_val, y, y_val, X_t, y_t):
 
 
 
-    # create our voting classifier, inputting our models
+    # create our voting classifier, inputting our model
     # estimators.append()
     ensemble = VotingClassifier(estimators, voting="hard", n_jobs=4,verbose=True)
     ensemble.fit(np.array(X), np.array(y))
